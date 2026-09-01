@@ -1,0 +1,203 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  creationTimestamp: null
+  labels:
+    app: ai-solutions
+  name: ai-solutions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-solutions
+  strategy: {}
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: ai-solutions
+    spec:
+      containers:
+      - image: 958065208983.dkr.ecr.us-west-1.amazonaws.com/ai-solutions:_BUILD__ID_
+        name: ai-solutions
+        imagePullPolicy: Always
+        resources: {}
+        ports:
+          - containerPort: 80
+        env:
+          - name: ENVIRONMENT
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: ENVIRONMENT
+          - name: E2B_API_KEY
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: E2B_API_KEY
+          - name: ANTHROPIC_API_KEY
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: ANTHROPIC_API_KEY
+          - name: CLAUDE_MODEL
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: CLAUDE_MODEL
+          - name: LLM_CONCURRENCY
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: LLM_CONCURRENCY
+          - name: AZURE_OPENAI_ENDPOINT
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AZURE_OPENAI_ENDPOINT
+          - name: AZURE_OPENAI_API_KEY
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AZURE_OPENAI_API_KEY
+          - name: AZURE_OPENAI_API_VERSION
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AZURE_OPENAI_API_VERSION
+          - name: AZURE_OPENAI_MODEL
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AZURE_OPENAI_MODEL
+          - name: AWS_S3_REACH_BUCKET
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AWS_S3_REACH_BUCKET
+          - name: AWS_S3_REACH_FILE
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AWS_S3_REACH_FILE
+          - name: SIMILAR_WEB_REST_API_KEY
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: SIMILAR_WEB_REST_API_KEY
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AWS_SECRET_ACCESS_KEY
+          - name: AWS_REGION
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AWS_REGION
+          - name: AWS_S3_BUCKET
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: AWS_S3_BUCKET
+          - name: DB_NAME
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: DB_NAME
+          - name: DB_USER
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: DB_USER
+          - name: DB_PASSWORD
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: DB_PASSWORD
+          - name: DB_HOST
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: DB_HOST
+          - name: DB_PORT
+            valueFrom:
+                secretKeyRef:
+                  name: ai-solutions-secret
+                  key: DB_PORT
+          - name: JWT_SECRET_KEY
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: JWT_SECRET_KEY
+          - name: ZEPTO_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: ZEPTO_USERNAME
+          - name: ZEPTO_PASSWD_KEY
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: ZEPTO_PASSWD_KEY
+          - name: ZEPTO_SERVER
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: ZEPTO_SERVER
+          - name: ZEPTO_PORT
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: ZEPTO_PORT
+          - name: ZEPTO_FROM
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: ZEPTO_FROM
+          - name: MICROSOFT_CLIENT_ID
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: MICROSOFT_CLIENT_ID
+          - name: MICROSOFT_CLIENT_SECRET
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: MICROSOFT_CLIENT_SECRET
+          - name: MICROSOFT_TENANT_ID
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: MICROSOFT_TENANT_ID
+          - name: MICROSOFT_USER_EMAIL
+            valueFrom:
+              secretKeyRef:
+                name: ai-solutions-secret
+                key: MICROSOFT_USER_EMAIL
+
+status: {}
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-solutions
+  labels:
+    app: ai-solutions
+
+spec:
+  type: ClusterIP
+
+  selector:
+    app: ai-solutions
+
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8000

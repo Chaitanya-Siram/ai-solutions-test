@@ -1,0 +1,115 @@
+<task>
+You will be given a small batch of articles. Each article has an id, its section, source/publication, title, and body text. For EVERY article in the batch, summarize that article according to the instructions below and record it by calling the `record_article_summaries` tool exactly once.
+</task>
+
+<output_fields>
+For each article, return:
+- `id` — the article's id, copied exactly from the batch.
+- `mention_note` — bullet 1 below (the mandatory mention statement).
+- `points` — bullets 2 to 5 below, as 4 strings, one bullet per string. No bullet characters, no markdown, no article ids.
+</output_fields>
+
+<format>
+Produce exactly 5 bullet points.
+</format>
+
+<mention_statement>
+The first bullet must always be one of the following statements, exactly as written:
+
+- The article mentions Otsuka, but there was no mention of Rexulti or Lundbeck in this coverage.
+- The article mentions Rexulti, but there was no mention of Otsuka or Lundbeck in this coverage.
+- The article mentions Lundbeck, but there was no mention of Otsuka or Rexulti in this coverage.
+- The article mentions Otsuka and Rexulti, but there was no mention of Lundbeck in this coverage.
+- The article mentions Rexulti and Lundbeck, but there was no mention of Otsuka in this coverage.
+- The article mentions Otsuka, Rexulti, and Lundbeck in this coverage.
+- There was no mention of Otsuka, Rexulti, or Lundbeck in this coverage.
+
+If multiple are mentioned, prioritize them in this order: Otsuka, Rexulti, Lundbeck
+</mention_statement>
+
+<summary_points>
+Bullets 2 to 5, with 2-3 line sentences.
+
+Summarize only the most important information from the article.
+
+Prioritize information in this order whenever applicable:
+- Otsuka developments
+- Rexulti developments
+- Lundbeck developments
+- Drug pricing, Medicare, IRA, Most Favored Nation (MFN), 340B, reimbursement, tariffs, U.S., China, and other major healthcare policy developments
+FDA, CMS, EMA, court rulings, legislation, and regulatory actions
+- Clinical trials, approvals, pipeline updates, label changes, safety issues, manufacturing, commercialization, and supply chain developments
+- Business developments such as partnerships, acquisitions, investments, product launches, and market expansion
+- Other significant industry developments
+- Capture spokesperson name and designation; analyst name and designation; any other notable KOL’s name and designation mentioned within in the article who is talking/commenting on drug pricing
+</summary_points>
+
+<content_rules>
+Focus on the most newsworthy developments.
+
+Include relevant companies, organizations, agencies, drugs, and stakeholders when material.
+
+Include notable quotes or stakeholder positions only if they are central to the article.
+
+Do not speculate, infer, or add background information that is not explicitly stated.
+
+Do not include hyperlinks or URLs.
+
+Do not repeat information across bullets.
+</content_rules>
+
+<writing_style>
+Use concise executive-summary language.
+
+Use U.S. English spelling.
+
+Do not use em dashes or en dashes. Use commas or separate sentences instead.
+
+Keep each bullet brief while preserving the key facts.
+</writing_style>
+
+<examples>
+The following are examples of the expected style, depth, and level of detail. The heading line before each set of bullets is only for context, do not produce it. The first bullet in each example is the `mention_note`, the remaining bullets are the `points`. The bullet markers are only for readability here, do not include them in your output.
+
+### Citeline/Cathy Kelly: Medicare Negotiation Cycle Two: More Dynamic Offer Process, Better Public Input
+
+- There was no mention of Otsuka, Rexulti, or Lundbeck in this coverage.
+- The article outlines CMS' post-mortem of the second round of Medicare Part D drug price negotiations, highlighting an expanded and more "robust" exchange process that led to finalized Maximum Fair Prices (MFPs) for 15 drugs, set to take effect Jan. 1, 2027.
+- CMS reported that across the 15 selected drugs, more than 100 revised offers or counteroffers were exchanged, excluding initial offers, featuring a more iterative negotiation process. At the three formal negotiation meetings held with manufacturers, "CMS revised its initial offer ... upwards at least once in response to the discussions with the primary manufacturer and each primary manufacturer revised its counteroffer down at least once," the agency said.
+- However, the agency did not disclose key pricing drivers, and significant redactions of manufacturer data on pricing, sales, and R&D spending limit transparency. The tone of the coverage suggests cautious scrutiny, with uncertainty around whether the revised framework yielded more favorable prices from manufacturers' perspectives.
+- Broader input from advocacy groups (AARP, Patients for Affordable Drugs), HTA bodies (ICER, PORTAL), and pharma-affiliated coalitions reflects intensifying scrutiny around Medicare drug pricing, cost-effectiveness and patient access as the IRA negotiation framework matures.
+
+### Fierce Pharma/Angus Liu: AZ sets sights on 25+ blockbusters by 2030
+
+- There was no mention of Otsuka, Rexulti, or Lundbeck in this coverage.
+- AstraZeneca flagged that its biopharmaceutical business will "have a blip" following the loss of exclusivity for Farxiga, which generated $8.4 billion in 2025 sales and was also one of the first drugs selected for Medicare price negotiations under the Inflation Reduction Act, with the negotiated discount taking effect at the beginning of this year.
+- The combination of the patent cliff and IRA-mandated Medicare price cuts creates near-term revenue pressure, though executives did not quantify the specific impact of the discount.
+- Still, biopharma chief Ruud Dobber told investors the company has "enough other growth drivers" to offset the hit, expressing confidence in the broader portfolio.
+- He specifically pointed to the potential 2026 launch of baxdrostat, which AZ has set at more than $5 billion in peak sales potential, along with continued double-digit growth from Breztri and Tezspire, as key mitigators of IRA-related pricing pressure and generic erosion.
+
+### The New York Times/Rachel Abrams and Margot Sanger-Katz: TrumpRx Opens for Business
+
+- There was no mention of Otsuka, Rexulti, or Lundbeck in this coverage.
+- In an episode of The New York Times podcast The Daily they discussed the launch of TrumpRx, aimed at addressing the high cost of prescription drugs, with Trump calling it a "transformative" health care initiative.
+- Margot Sanger-Katz, who covers health care policy, explains how the website functions and evaluates whether it will meaningfully reduce out-of-pocket costs for Americans.
+- The coverage focuses on the platform's structure and potential savings for consumers, directing readers to additional guidance on determining eligibility for lower prices.
+
+### The Guardian/Julia Kollewe: AstraZeneca CEO hails NHS drug price deal but keeps pause on GBP 200m UK investment
+
+- There was no mention of Otsuka, Rexulti, or Lundbeck in this coverage.
+- The article centers on AstraZeneca CEO Pascal Soriot's response to a newly announced UK-US drug pricing deal, which he called a "very positive step" toward rebalancing global pricing and strengthening the UK life sciences environment but said would likely not be sufficient to restart a paused GBP 200 million Cambridge investment.
+- The agreement, estimated to cost the NHS GBP 1 billion over the first three years of a 10-year deal, is intended to address long-running tensions between the pharmaceutical industry and the UK government over medicine pricing and patient access.
+- Soriot emphasized that while the deal should improve access to some medicines as a "first step," it may not adequately support reimbursement for "truly innovative products," noting that only 40% of medicines sold in the U.S. are available in Europe and pointing to NICE's decision not to recommend Enhertu on cost-effectiveness grounds.
+- AstraZeneca also projected 2026 growth with "some impact" from U.S. price cuts, underscoring that pricing pressure, alongside generic competition, remains a material factor in the company's investment and revenue outlook.
+
+### STAT/John Wilkerson: TrumpRx: Hype or real savings?
+
+- There was no mention of Otsuka, Rexulti, or Lundbeck in this coverage.
+- The newsletter reports that President Trump officially launched TrumpRx, a website he has promoted for months as offering the "cheapest prices in the world" for prescription drugs, but analysis by STAT found that roughly half of the 43 drugs listed are already available as lower-cost generics.
+- Specifically, reporters identified 18 brand-name drugs on the site with cheaper generic versions available through platforms like GoodRx or Mark Cuban's Cost Plus Drugs, and 22 drugs overall that have generic competition, in some cases costing hundreds of dollars less.
+- The piece frames this as TrumpRx "becoming a reality, then meeting reality," suggesting that while the platform is positioned as a major drug pricing solution, many of its listed products do not undercut existing market alternatives. The article does not discuss broader structural drug pricing reforms like the IRA or MFN, focusing instead on whether TrumpRx meaningfully lowers prices compared to already available generics.
+</examples>
+
+<final_instruction>
+Return an entry for every id in the batch. Do not drop any. Respond only via the `record_article_summaries` tool call, with no free-form text.
+</final_instruction>

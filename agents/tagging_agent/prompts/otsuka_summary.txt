@@ -1,0 +1,20 @@
+Write a SINGLE PARAGRAPH only (no bullets). Keep the summary under 80 words whenever possible (typically 60–80 words).
+Use concise, factual language focused on the most material news, findings, data, policy implications, and stakeholder comments.
+Include key stakeholder names, titles/designations, and organizations when mentioned.
+Attribute viewpoints to the relevant individual and organization.
+Avoid promotional language and avoid words such as “highlight,” “underscore,” and “reinforce.”
+Do not use hyperlinks.
+
+Mention rules:
+If Otsuka, Rexulti, and/or Lundbeck are mentioned, incorporate those mentions naturally into the summary body.
+The mention statement must ALWAYS appear as the FINAL sentence of the paragraph.
+Use one of the following exact formats:
+“The article mentions Otsuka, but there was no mention of Rexulti or Lundbeck in this coverage.”
+“The article mentions Rexulti, but there was no mention of Otsuka or Lundbeck in this coverage.”
+“The article mentions Lundbeck, but there was no mention of Otsuka or Rexulti in this coverage.”
+“The article mentions Otsuka and Rexulti, but there was no mention of Lundbeck in this coverage.”
+“The article mentions Rexulti and Lundbeck, but there was no mention of Otsuka in this coverage.”
+“The article mentions Otsuka, Rexulti, and Lundbeck in this coverage.”
+“There was no mention of Otsuka, Rexulti or Lundbeck in this coverage.”
+
+Examples of preferred style: “MapLight Therapeutics reported that ML-004 failed to meet the primary endpoint in a Phase 2 autism study but showed clinically meaningful reductions in irritability among certain adolescents. The company plans to discuss a potential regulatory pathway with the FDA. The coverage references Otsuka’s Abilify and Johnson & Johnson’s Risperdal as approved treatments for autism-related irritability. The article mentions Otsuka, but there was no mention of Rexulti or Lundbeck in this coverage.” “CMS proposed regulations to permanently codify the Medicare Drug Price Negotiation Program beginning with the 2029 cycle, creating greater certainty around future negotiations and potential implications for pharmaceutical pricing strategies. Industry stakeholders said the rulemaking process could open new avenues for legal challenges. There was no mention of Otsuka, Rexulti or Lundbeck in this coverage.” Always: Prioritize the most newsworthy developments. Keep the summary to one paragraph. End with the Otsuka/Rexulti/Lundbeck mention statement. Do not use bullets. Do not use hyperlinks. Additionally, remember these standing preferences: Include full names, titles/designations, and affiliated organizations for people mentioned. Explicitly attribute opinions or comments to those individuals and organizations. Keep the summary concise and suitable for media-monitoring reports.

@@ -1,0 +1,55 @@
+name: ai-solutions Dev Deployment
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+
+   build:
+      runs-on: ubuntu-latest
+      steps:
+         - uses: actions/checkout@master
+
+         - name: Configure AWS credentials
+           uses: aws-actions/configure-aws-credentials@v1
+           with:
+             aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+             aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+             aws-region: us-west-1
+
+         - name: Login to Amazon ECR
+           id: login-ecr
+           uses: aws-actions/amazon-ecr-login@v1
+
+         - name: Build, tag, and push image to Amazon ECR
+           id: build-image
+           env:
+             ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+             IMAGE_TAG: ${{ github.run_number }}
+           run: |
+             docker build -f Dockerfile -t 958065208983.dkr.ecr.us-west-1.amazonaws.com/ai-solutions:${{ github.run_number }} .
+             docker push 958065208983.dkr.ecr.us-west-1.amazonaws.com/ai-solutions:${{ github.run_number }}
+   deploy:
+      needs: build
+      runs-on: ubuntu-latest
+      steps:
+         - uses: actions/checkout@master
+         - uses: richardrigutins/replace-in-files@v1
+           with:
+              files: "./build/ai-solutions.yaml"
+              search-text: '_BUILD__ID_'
+              replacement-text: '${{ github.run_number }}'
+
+         - name: Deploy
+           uses: safe2008/eks-actions@v0.0.4
+           env:
+             aws_access_key_id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+             aws_secret_access_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+             aws_region: us-west-1
+             cluster_name: AMX-EKS
+           with:
+             args: |
+               kubectl apply -f ./build/ai-solutions.yaml -n ai-solutions
+ 
