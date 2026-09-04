@@ -1,3 +1,4 @@
+import contextvars
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -468,8 +469,12 @@ def run_in_batches_streaming(
 
     max_workers = max(1, min(envs.LLM_CONCURRENCY, total_batches))
     completed = 0
+    # ThreadPoolExecutor workers don't inherit the calling context on their own
+    # (unlike asyncio.to_thread), so the active UsageTracker — set via
+    # track_usage() by the WS handler — has to be carried in explicitly.
+    ctx = contextvars.copy_context()
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(run_chunk, i, c) for i, c in enumerate(chunks)]
+        futures = [pool.submit(ctx.run, run_chunk, i, c) for i, c in enumerate(chunks)]
         for fut in as_completed(futures):
             try:
                 idx, result = fut.result()
@@ -524,8 +529,9 @@ def run_in_batches(
     if len(chunks) == 1 or envs.LLM_CONCURRENCY <= 1:
         results = [run_chunk(c) for c in chunks]
     else:
+        ctx = contextvars.copy_context()
         with ThreadPoolExecutor(max_workers=min(envs.LLM_CONCURRENCY, len(chunks))) as pool:
-            results = list(pool.map(run_chunk, chunks))
+            results = list(pool.map(lambda c: ctx.run(run_chunk, c), chunks))
     out: list[dict[str, Any]] = []
     for r in results:
         out.extend(r)

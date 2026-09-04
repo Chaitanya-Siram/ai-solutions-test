@@ -1,6 +1,7 @@
 from typing import Any
 from anthropic import Anthropic
 from configs import envs, logger
+from ai_helpers.usage_tracking import record_usage
 from .tagging_common import (
     TAG_TOOL_DESCRIPTION,
     TAG_TOOL_NAME,
@@ -64,6 +65,8 @@ def _tag_batch(
             messages=[{"role": "user", "content": build_batch_message(articles)}],
         ) as stream:
             response = stream.get_final_message()
+        if response.usage:
+            record_usage("claude", envs.CLAUDE_MODEL, response.usage.input_tokens, response.usage.output_tokens)
         taggings = _extract_taggings(response)
     except Exception as exc:
         logger.error(f"Claude batch tagging failed for {len(articles)} articles: {exc}")

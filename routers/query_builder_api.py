@@ -17,7 +17,10 @@ Server frame types:
         (a confirmed-value card, interleaved in display order)
   - {"type": "confirm", "stage": int}        (show Save / Cancel buttons)
   - {"type": "saved", "session": {...}}      (Save succeeded — DB row created)
-  - {"type": "state", "stage": int, "state": {...}}    (last frame of every turn)
+  - {"type": "state", "stage": int, "state": {...}, "usage": {...}}
+        (last frame of every turn; "usage" carries this-turn and running-session
+        token counts + cost so the client can show a live meter — see UsageTracker
+        in agents/chart_generator/llm_client.py)
   - {"type": "error", "detail": str}
 """
 import asyncio
@@ -25,6 +28,7 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from agents.chart_generator.llm_client import UsageTracker, track_usage
 from agents.query_builder_agent.agent import (
     begin_session,
     build_session_payload,
@@ -38,7 +42,29 @@ from db_helpers.repository.generated_query_db import create_generated_query_reco
 router = APIRouter(tags=["query-builder"])
 
 
-async def _emit_turn(websocket: WebSocket, state: AgentState, result: dict[str, Any]) -> None:
+def _usage_payload(turn_usage: UsageTracker, session_totals: dict[str, float]) -> dict[str, Any]:
+    """Fold this turn's usage into the running session totals and return both,
+    so the client can show a live per-turn delta plus a running total/cost."""
+    session_totals["input_tokens"] += turn_usage.input_tokens
+    session_totals["output_tokens"] += turn_usage.output_tokens
+    session_totals["cost_usd"] += turn_usage.cost_usd
+    return {
+        "turn_input_tokens": turn_usage.input_tokens,
+        "turn_output_tokens": turn_usage.output_tokens,
+        "turn_cost_usd": turn_usage.cost_usd,
+        "session_input_tokens": session_totals["input_tokens"],
+        "session_output_tokens": session_totals["output_tokens"],
+        "session_cost_usd": session_totals["cost_usd"],
+    }
+
+
+async def _emit_turn(
+    websocket: WebSocket,
+    state: AgentState,
+    result: dict[str, Any],
+    turn_usage: UsageTracker,
+    session_totals: dict[str, float],
+) -> None:
     """Replay the ordered turn events (messages, artifact cards, Save/Cancel prompts),
     then the state frame. Non-message events (artifact / confirm) are forwarded as-is
     with the current stage attached, so they land exactly where the agent emitted them."""
@@ -52,7 +78,12 @@ async def _emit_turn(websocket: WebSocket, state: AgentState, result: dict[str, 
             })
         else:
             await websocket.send_json({**ev, "stage": state.stage})
-    await websocket.send_json({"type": "state", "stage": state.stage, "state": state.model_dump()})
+    await websocket.send_json({
+        "type": "state",
+        "stage": state.stage,
+        "state": state.model_dump(),
+        "usage": _usage_payload(turn_usage, session_totals),
+    })
 
 
 def _save_session(project_id: int, state: AgentState) -> dict[str, Any]:
@@ -105,10 +136,12 @@ async def query_builder_stream(websocket: WebSocket) -> None:
             project_id = None
 
     state = AgentState()
+    session_totals = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
     try:
         # Opening turn (Stage 1 greeting) — runs off the event loop (LLM call).
-        opening = await asyncio.to_thread(begin_session, state)
-        await _emit_turn(websocket, state, opening)
+        with track_usage() as usage:
+            opening = await asyncio.to_thread(begin_session, state)
+        await _emit_turn(websocket, state, opening, usage, session_totals)
 
         while True:
             payload = await websocket.receive_json()
@@ -140,8 +173,9 @@ async def query_builder_stream(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "error", "detail": "Send a non-empty 'message'."})
                 continue
 
-            result = await asyncio.to_thread(process_turn, state, message)
-            await _emit_turn(websocket, state, result)
+            with track_usage() as usage:
+                result = await asyncio.to_thread(process_turn, state, message)
+            await _emit_turn(websocket, state, result, usage, session_totals)
 
     except WebSocketDisconnect:
         logger.info("Query-builder websocket disconnected by client")

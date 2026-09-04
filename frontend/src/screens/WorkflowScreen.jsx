@@ -35,7 +35,12 @@ const IDLE_JOB = {
   progress: { done: 0, total: 0 },
   totalArticles: 0,
   errorMsg: '',
+  relevancyUsage: null, // { input_tokens, output_tokens, cost_usd } once the relevancy gate finishes
+  taggingUsage: null,   // running cumulative total across tagging batches so far
 }
+
+// "1,234 tok · $0.0041"
+const fmtUsage = (u) => `${(u.input_tokens + u.output_tokens).toLocaleString()} tok · $${u.cost_usd.toFixed(4)}`
 
 // The default seed: a single Data node pre-filled from the uploaded file.
 function seedNodes(session, project) {
@@ -214,11 +219,24 @@ function WorkflowCanvas({ project, session, theme, onToggleTheme, onBack, onOpen
             )
             break
           case 'batch':
-            setJob((j) => ({ ...j, progress: { done: msg.completed_batches || 0, total: msg.total_batches || 0 } }))
-            push(`Batch ${(msg.batch_index ?? 0) + 1} done — ${msg.completed_batches}/${msg.total_batches} batches (${msg.tagged_count} tagged)`)
+            setJob((j) => ({
+              ...j,
+              progress: { done: msg.completed_batches || 0, total: msg.total_batches || 0 },
+              taggingUsage: msg.usage || j.taggingUsage,
+            }))
+            push(
+              `Batch ${(msg.batch_index ?? 0) + 1} done — ${msg.completed_batches}/${msg.total_batches} batches (${msg.tagged_count} tagged)`
+              + (msg.usage ? ` · ${fmtUsage(msg.usage)}` : ''),
+            )
             break
           case 'progress':
             push(msg.message || 'Working…')
+            break
+          case 'usage':
+            // One-shot usage report for a non-batched LLM step (currently just
+            // the relevancy gate) — tagging's own usage streams via 'batch' above.
+            setJob((j) => (msg.step === 'relevancy' ? { ...j, relevancyUsage: msg } : j))
+            push(`${msg.step === 'relevancy' ? 'Relevancy check' : msg.step}: ${fmtUsage(msg)}`)
             break
           case 'complete':
             setJob((j) => ({
@@ -227,9 +245,10 @@ function WorkflowCanvas({ project, session, theme, onToggleTheme, onBack, onOpen
               progress: { done: j.progress.total || j.progress.done, total: j.progress.total || j.progress.done },
             }))
             push(
-              kind === 'charts'
+              (kind === 'charts'
                 ? `Dashboards ready${msg.elapsed_seconds ? ` in ${msg.elapsed_seconds}s` : ''}.`
-                : `Completed ${msg.total_tagged} articles in ${msg.elapsed_seconds}s.`,
+                : `Completed ${msg.total_tagged} articles in ${msg.elapsed_seconds}s.`)
+              + (msg.usage ? ` · ${fmtUsage(msg.usage)}` : ''),
             )
             onDone?.(msg)
             break
@@ -666,6 +685,15 @@ function WorkflowCanvas({ project, session, theme, onToggleTheme, onBack, onOpen
                   <div className="wflog__head-right">
                     {job.progress.total > 0 && job.phase !== 'error' && (
                       <span className="tagpanel__count">{job.progress.done}/{job.progress.total} · {jobPct}%</span>
+                    )}
+                    {(job.relevancyUsage || job.taggingUsage) && job.phase !== 'error' && (
+                      <span className="tagpanel__usage">
+                        {fmtUsage({
+                          input_tokens: (job.relevancyUsage?.input_tokens || 0) + (job.taggingUsage?.input_tokens || 0),
+                          output_tokens: (job.relevancyUsage?.output_tokens || 0) + (job.taggingUsage?.output_tokens || 0),
+                          cost_usd: (job.relevancyUsage?.cost_usd || 0) + (job.taggingUsage?.cost_usd || 0),
+                        })}
+                      </span>
                     )}
                     <button
                       className="wfic wfic--sm"

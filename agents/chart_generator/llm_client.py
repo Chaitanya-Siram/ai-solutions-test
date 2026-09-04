@@ -13,12 +13,19 @@ import re
 from typing import Any
 
 from configs import envs, logger
+from ai_helpers.usage_tracking import UsageTracker, record_usage, track_usage
 
 _CLAUDE_ALIASES = {"claude", "anthropic"}
 _AZURE_ALIASES = {"azure_openai", "azure-openai", "azure", "openai", "gpt", "gpt-azure"}
 
 _anthropic_client = None
 _azure_client = None
+
+# Re-exported so existing `from agents.chart_generator.llm_client import
+# UsageTracker, track_usage` call sites (query_builder_api.py) keep working.
+__all__ = ["complete", "complete_web", "complete_json", "complete_json_web", "UsageTracker", "track_usage"]
+
+_record_usage = record_usage
 
 
 def _get_anthropic():
@@ -71,6 +78,11 @@ def complete(system: str, user: str, max_tokens: int = 4096, temperature: float 
                 {"role": "user", "content": user},
             ],
         )
+        if completion.usage:
+            _record_usage(
+                "azure", envs.AZURE_OPENAI_MODEL,
+                completion.usage.prompt_tokens, completion.usage.completion_tokens,
+            )
         if not completion.choices:
             raise ValueError("Azure OpenAI returned no choices")
         return (completion.choices[0].message.content or "").strip()
@@ -84,6 +96,8 @@ def complete(system: str, user: str, max_tokens: int = 4096, temperature: float 
             system=[{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
             messages=[{"role": "user", "content": user}],
         )
+        if resp.usage:
+            _record_usage("claude", envs.CLAUDE_MODEL, resp.usage.input_tokens, resp.usage.output_tokens)
         parts = [getattr(b, "text", "") for b in resp.content if getattr(b, "type", None) == "text"]
         return "".join(parts).strip()
 
@@ -110,6 +124,8 @@ def complete_web(system: str, user: str, max_tokens: int = 4096, max_uses: int =
         messages=[{"role": "user", "content": user}],
         tools=[{"type": "web_search_20250305", "name": "web_search", "max_uses": max_uses}],
     )
+    if resp.usage:
+        _record_usage("claude", envs.CLAUDE_MODEL, resp.usage.input_tokens, resp.usage.output_tokens)
     # The model interleaves search/tool blocks with text; the answer is the text.
     parts = [getattr(b, "text", "") for b in resp.content if getattr(b, "type", None) == "text"]
     return "".join(parts).strip()

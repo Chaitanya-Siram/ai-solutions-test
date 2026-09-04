@@ -1388,6 +1388,16 @@ button {
   color: var(--text-soft);
   white-space: nowrap;
 }
+.tagpanel__usage {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 10%, transparent);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
 .tagpanel__actions {
   display: flex;
   justify-content: flex-end;
@@ -2791,6 +2801,17 @@ button {
   background: var(--surface-2);
   border-radius: 999px;
   padding: 2px 8px;
+}
+
+.qb__usagebar {
+  padding: 6px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--accent-2);
+  background: color-mix(in srgb, var(--accent-2) 8%, transparent);
+  border-bottom: 1px solid var(--border);
 }
 
 /* Multi-select option picker (competitors) */

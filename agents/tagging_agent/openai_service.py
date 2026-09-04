@@ -2,6 +2,7 @@ import json
 from typing import Any
 from openai import AzureOpenAI
 from configs import envs, logger
+from ai_helpers.usage_tracking import record_usage
 from .tagging_common import (
     TAG_TOOL_DESCRIPTION,
     TAG_TOOL_NAME,
@@ -103,6 +104,11 @@ def _tag_batch(
                 }
             },
         )
+        if completion.usage:
+            record_usage(
+                "azure", envs.AZURE_OPENAI_MODEL,
+                completion.usage.prompt_tokens, completion.usage.completion_tokens,
+            )
         taggings = _extract_taggings(completion)
     except Exception as exc:  # noqa: BLE001
         logger.error(f"Azure OpenAI batch tagging failed for {len(articles)} articles: {exc}")

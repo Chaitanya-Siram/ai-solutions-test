@@ -7,6 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, WebSocket, WebSoc
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from agents.tagging_agent.llm_service import tag_articles, tag_articles_streaming
+from ai_helpers.usage_tracking import track_usage
 from agents.tagging_agent.tagging_common import merge_tagged_with_articles, merge_tagged_with_syndication, build_irrelevant_entries
 from ai_helpers.article_linker import link_syndication
 from ai_helpers.embedding_linker import assign_similar_incremental
@@ -547,9 +548,11 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
         # blank tags so the review UI can list and later promote them. Stamp the
         # flags back onto the raw rows too.
         await websocket.send_json({"type": "progress", "message": "Checking article relevancy…"})
-        relevant, irrelevant = await asyncio.to_thread(
-            apply_relevancy, articles, brand_keywords, competitor_keywords, relevancy_prompt, relevancy_domains
-        )
+        with track_usage() as relevancy_usage:
+            relevant, irrelevant = await asyncio.to_thread(
+                apply_relevancy, articles, brand_keywords, competitor_keywords, relevancy_prompt, relevancy_domains
+            )
+        await websocket.send_json({"type": "usage", "step": "relevancy", **relevancy_usage.as_dict()})
         await asyncio.to_thread(stamp_relevancy, db, scope, articles)
         articles = relevant
         if irrelevant:
@@ -594,6 +597,7 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
 
         logger.info("Running AI tagging (streaming)")
         started = time.time()
+        tagging_usage_totals = {"input_tokens": 0, "output_tokens": 0, "cost_usd": 0.0}
         # Only spin up the streaming worker when there is something to tag; when
         # every article is reused (all sources already tagged) skip it entirely.
         if to_tag:
@@ -603,31 +607,37 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
             queue: asyncio.Queue = asyncio.Queue()
             DONE = object()
 
-            def on_batch_done(payload: dict[str, Any]) -> None:
-                loop.call_soon_threadsafe(queue.put_nowait, payload)
+            with track_usage() as tagging_usage:
+                def on_batch_done(payload: dict[str, Any]) -> None:
+                    # Live running total at the moment this batch finished — read
+                    # off the same tracker instance every batch mutates in place.
+                    loop.call_soon_threadsafe(
+                        queue.put_nowait, {**payload, "usage": tagging_usage.as_dict()}
+                    )
 
-            task = asyncio.create_task(
-                asyncio.to_thread(
-                    tag_articles_streaming,
-                    to_tag,
-                    brand_keywords,
-                    competitor_keywords,
-                    sections_prompt,
-                    on_batch_done,
-                    project_name,
+                task = asyncio.create_task(
+                    asyncio.to_thread(
+                        tag_articles_streaming,
+                        to_tag,
+                        brand_keywords,
+                        competitor_keywords,
+                        sections_prompt,
+                        on_batch_done,
+                        project_name,
+                    )
                 )
-            )
-            # Sentinel is enqueued only after the worker fully returns, so it always
-            # trails every batch payload (call_soon_threadsafe preserves FIFO order).
-            task.add_done_callback(lambda _: queue.put_nowait(DONE))
+                # Sentinel is enqueued only after the worker fully returns, so it always
+                # trails every batch payload (call_soon_threadsafe preserves FIFO order).
+                task.add_done_callback(lambda _: queue.put_nowait(DONE))
 
-            while True:
-                payload = await queue.get()
-                if payload is DONE:
-                    break
-                await websocket.send_json(payload)
+                while True:
+                    payload = await queue.get()
+                    if payload is DONE:
+                        break
+                    await websocket.send_json(payload)
 
-            llm_tagged = await task  # re-raise any exception from the tagging thread
+                llm_tagged = await task  # re-raise any exception from the tagging thread
+            tagging_usage_totals = tagging_usage.as_dict()
         else:
             llm_tagged = []
         logger.info(f"Tagging completed in {time.time() - started:.1f}s")
@@ -664,6 +674,11 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
                 "relevant_count": len(final_articles) - len(irrelevant),
                 "irrelevant_count": len(irrelevant),
                 "elapsed_seconds": round(time.time() - started, 1),
+                "usage": {
+                    "input_tokens": relevancy_usage.input_tokens + tagging_usage_totals["input_tokens"],
+                    "output_tokens": relevancy_usage.output_tokens + tagging_usage_totals["output_tokens"],
+                    "cost_usd": relevancy_usage.cost_usd + tagging_usage_totals["cost_usd"],
+                },
             }
         )
     except WebSocketDisconnect:

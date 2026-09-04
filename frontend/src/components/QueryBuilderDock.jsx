@@ -75,6 +75,7 @@ export default function QueryBuilderDock({ projectId, onSaved }) {
   const [thread, setThread] = useState([])
   const [opts, setOpts] = useState(null) // { options:[...], selected:Set, custom:'' }
   const [canSave, setCanSave] = useState(false) // a Save/Cancel prompt is pending
+  const [usage, setUsage] = useState(null) // { tokens, cost } — running session total
   const wsRef = useRef(null)
   const bottomRef = useRef(null)
 
@@ -90,6 +91,7 @@ export default function QueryBuilderDock({ projectId, onSaved }) {
     setThread([])
     setOpts(null)
     setCanSave(false)
+    setUsage(null)
     setBusy(true)
     const ws = new WebSocket(queryBuilderWsUrl(projectId))
     wsRef.current = ws
@@ -124,6 +126,12 @@ export default function QueryBuilderDock({ projectId, onSaved }) {
           break
         case 'state':
           if (msg.state?.stage) setStage(msg.state.stage)
+          if (msg.usage) {
+            setUsage({
+              tokens: msg.usage.session_input_tokens + msg.usage.session_output_tokens,
+              cost: msg.usage.session_cost_usd,
+            })
+          }
           setBusy(false) // last frame of a turn → ready for input
           break
         case 'error':
@@ -232,6 +240,12 @@ export default function QueryBuilderDock({ projectId, onSaved }) {
           <CloseIcon width={16} height={16} />
         </button>
       </header>
+
+      {usage && (
+        <div className="qb__usagebar" title={`${usage.tokens.toLocaleString()} tokens this session`}>
+          {usage.tokens.toLocaleString()} tokens · ${usage.cost.toFixed(4)}
+        </div>
+      )}
 
       <div className="chatdock__thread">
         {thread.length === 0 && !busy && <div className="chatdock__empty"><p>Connecting…</p></div>}
