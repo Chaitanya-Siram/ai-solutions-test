@@ -61,6 +61,11 @@ class Configs:
     CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5")
     MAX_OUTPUT_TOKENS = int(os.getenv("MAX_OUTPUT_TOKENS", "32000"))
 
+    # Langfuse observability (optional — leave blank to disable tracing)
+    LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY", "")
+    LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY", "")
+    LANGFUSE_HOST = os.getenv("LANGFUSE_HOST", "https://cloud.langfuse.com")
+
     # E2B sandbox (used by the chart-code agent to run LLM-generated Python)
     E2B_API_KEY = os.getenv("E2B_API_KEY", "")
 

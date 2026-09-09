@@ -12,6 +12,7 @@ import { fetchCharts } from '../api/charts.js'
 export const paths = {
   login: () => '/login',
   users: () => '/users',
+  userMetrics: (userId) => `/users/${encodeURIComponent(userId)}/metrics`,
   projects: () => '/',
   project: (pid) => `/${pid}/sessions`,
   comparisons: (pid) => `/${pid}/comparisons`,

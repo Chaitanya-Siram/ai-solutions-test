@@ -1,9 +1,9 @@
-import contextvars
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 from agents.tagging_agent.llm_service import _AZURE_ALIASES
+from ai_helpers.usage_tracking import worker_context
 from configs import envs, logger
 
 
@@ -385,7 +385,7 @@ def _tag_with_split_retry(
         for r in sub:
             if r.get("sentiment") is not None:
                 by_id[r["id"]] = r
-    return [by_id[a["id"]] for a in articles]
+    return [by_id.get(a["id"], blank_tagging(a["id"])) for a in articles]
 
 
 # How many times to re-attempt articles that came back completely untagged
@@ -443,7 +443,7 @@ def _retry_untagged(
             logger.warning(f"Untagged retry round {round_no} recovered nothing — giving up")
             break
 
-    return [by_id[a["id"]] for a in projected]
+    return [by_id.get(a["id"], blank_tagging(a["id"])) for a in projected]
 
 
 def run_in_batches_streaming(
@@ -469,12 +469,13 @@ def run_in_batches_streaming(
 
     max_workers = max(1, min(envs.LLM_CONCURRENCY, total_batches))
     completed = 0
-    # ThreadPoolExecutor workers don't inherit the calling context on their own
-    # (unlike asyncio.to_thread), so the active UsageTracker — set via
-    # track_usage() by the WS handler — has to be carried in explicitly.
-    ctx = contextvars.copy_context()
+
+    def _run_chunk_in_ctx(i: int, c: list[dict[str, Any]]) -> tuple[int, list[dict[str, Any]]]:
+        with worker_context():
+            return run_chunk(i, c)
+
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
-        futures = [pool.submit(ctx.run, run_chunk, i, c) for i, c in enumerate(chunks)]
+        futures = [pool.submit(_run_chunk_in_ctx, i, c) for i, c in enumerate(chunks)]
         for fut in as_completed(futures):
             try:
                 idx, result = fut.result()
@@ -529,9 +530,12 @@ def run_in_batches(
     if len(chunks) == 1 or envs.LLM_CONCURRENCY <= 1:
         results = [run_chunk(c) for c in chunks]
     else:
-        ctx = contextvars.copy_context()
+        def _run_chunk_in_ctx(c: list[dict[str, Any]]) -> list[dict[str, Any]]:
+            with worker_context():
+                return run_chunk(c)
+
         with ThreadPoolExecutor(max_workers=min(envs.LLM_CONCURRENCY, len(chunks))) as pool:
-            results = list(pool.map(lambda c: ctx.run(run_chunk, c), chunks))
+            results = list(pool.map(_run_chunk_in_ctx, chunks))
     out: list[dict[str, Any]] = []
     for r in results:
         out.extend(r)

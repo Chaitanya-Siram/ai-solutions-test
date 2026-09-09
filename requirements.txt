@@ -28,3 +28,4 @@ numpy>=1.26
 # Optional embedding providers (see EMBEDDING_PROVIDER in configs.py):
 # voyageai>=0.3          # EMBEDDING_PROVIDER=voyage
 sentence-transformers  # EMBEDDING_PROVIDER=local (pulls in torch, ~2GB)
+langfuse               # LLM observability (optional — set LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY to enable)

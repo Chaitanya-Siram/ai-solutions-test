@@ -24,7 +24,7 @@ cd frontend && npx esbuild src/screens/ReviewScreen.jsx --outfile=$TEMP/out.js
 
 There is **no test suite, linter, or formatter** configured — no pytest, no eslint. Validate changes by importing the module (backend) or esbuild/`npm run build` (frontend).
 
-Requires a reachable PostgreSQL and a populated `.env` (see `Configs` in [configs.py](configs.py); it logs a warning per missing required var at startup).
+Requires a reachable PostgreSQL and a populated `.env` (see `Configs` in [configs.py](configs.py); it logs a warning per missing required var at startup). Frontend needs `frontend/.env` with `VITE_API_BASE_URL=http://localhost:8000` for local dev (copy from `frontend/.env.example`).
 
 Deployment: push to `master` builds [Dockerfile](Dockerfile) → ECR → EKS via [.github/workflows/main.yml](.github/workflows/main.yml), applying [build/ai-solutions.yaml](build/ai-solutions.yaml).
 
@@ -81,18 +81,19 @@ Anything that takes minutes streams typed JSON messages instead of blocking a re
 
 ### Pluggable providers
 
-- **LLM**: `LLM_PROVIDER` selects `ai_helpers/openai_service.py` (Azure OpenAI) or `ai_helpers/claude_service.py`. `ai_helpers/llm_service.py` is the only dispatcher — both providers must implement `tag_articles` and `tag_articles_streaming` identically.
+- **LLM**: `LLM_PROVIDER` selects `agents/tagging_agent/openai_service.py` (Azure OpenAI) or `agents/tagging_agent/claude_service.py`. `agents/tagging_agent/llm_service.py` is the only dispatcher — both providers must implement `tag_articles` and `tag_articles_streaming` identically. `agents/tagging_agent/tag_reuse.py` intercepts before the LLM call and copies existing tags to duplicate `article_id`s, avoiding redundant API cost.
 - **Embeddings**: `EMBEDDING_PROVIDER` = `local` (sentence-transformers, pulls ~2GB of torch), `openai`, or `voyage`.
 - **Chart code execution**: LLM-generated Python runs in an E2B sandbox ([agents/chart_generator/sandbox.py](agents/chart_generator/sandbox.py)), retried up to 3× with the error fed back.
 
 ### Client-specific behavior is keyed off names, not config
 
-Two separate dispatch points, both string-matched:
+Three separate dispatch points, all string-matched:
 
 - Fetch pipeline, by **project name** — `is_beone_project()` / `is_trane_project()` in [data_source_helpers/fetching_service.py](data_source_helpers/fetching_service.py) route to bespoke source sets. Trane is currently commented out.
 - Report layout, by **first brand keyword** — `"trane"` / `"otsuka"` substring checks in [routers/report_api.py](routers/report_api.py), everything else gets the BeOne layout. Otsuka has two layouts picked by a `variant` query param: `"coverage"` (default, static build) vs `"summary"`, which runs the articles through `agents/otsuka_report_agent/otsuka_report_synthesizer.py` first to LLM-write the executive summary and per-article blurbs before building the doc.
+- **LLM summary prompts**, by client — `agents/tagging_agent/beone_summary.txt`, `otsuka_summary.txt`, and `default_summary.txt` are picked per-project during tagging. Adding a new client may require a new summary prompt file here.
 
-Adding a client means touching both, plus a `reports_helpers/<client>_report.py`.
+Adding a client means touching all three, plus a `reports_helpers/<client>_report.py`.
 
 ### Schema migrations live in code, not Alembic
 
@@ -101,9 +102,20 @@ Adding a client means touching both, plus a `reports_helpers/<client>_report.py`
 - `create_all` skips existing tables **including their indexes**, so a new index on a live table must be added to `_ADDED_INDEXES` as well as the model's `__table_args__`.
 - Column drops carry a **SQL guard expression** proving the data was migrated; a false guard leaves the column and logs why. Never drop blind — the drop runs at every startup.
 
+### Scheduler vs. cron jobs
+
+Two independent background systems start from `main.py`'s startup hook:
+
+- **Hourly scheduler** (`scheduler.py`) — fetches and tags project pools on per-query `schedule_time` offsets. Documented above.
+- **Daily cron** (`cron_jobs_helpers/cron_jobs.py`) — runs `cron_daily_reporting.py` (automated report generation) and `cron_onedrive_files_sync.py` (syncs OneDrive-hosted article files into the pipeline). `CRON_TIMEZONE` defaults to `"Asia/Kolkata"`.
+
+OneDrive is a full ingest path: `data_source_helpers/onedrive_client.py` fetches files, the daily cron syncs them, and `routers/onedrive_api.py` exposes manual controls.
+
 ### Layout
 
-`routers/` HTTP+WS endpoints (all JWT-protected except `/auth/*` and user registration) · `db_helpers/models` SQLAlchemy + Pydantic side by side in one file per table · `db_helpers/repository` all query logic · `ai_helpers/` LLM services, linkers, synthesizers, prompts as `.txt` · `agents/` multi-step LLM flows with their own prompts · `data_source_helpers/` fetchers and scrapers · `charts_helpers/` dashboard computation per `DASHBOARDS_ENUM` · `reports_helpers/` .docx builders · `frontend/src/api/` one module per router, all through `apiFetch` in [frontend/src/api/http.js](frontend/src/api/http.js) which handles 401→refresh→retry single-flight.
+`routers/` HTTP+WS endpoints (all JWT-protected except `/auth/*` and user registration) · `db_helpers/models` SQLAlchemy + Pydantic side by side in one file per table · `db_helpers/repository` all query logic · `ai_helpers/` synthesizers, linkers, embedding service, usage tracking (token cost) · `agents/` multi-step LLM flows — each subdirectory owns its `llm_service.py` + prompts · `data_source_helpers/` fetchers and scrapers · `cron_jobs_helpers/` daily background jobs · `charts_helpers/` dashboard computation per `DASHBOARDS_ENUM` · `reports_helpers/` .docx builders · `mail_helpers/` email delivery · `file_helpers/` file I/O utilities · `auth_helpers/` JWT helpers · `frontend/src/api/` one module per router, all through `apiFetch` in [frontend/src/api/http.js](frontend/src/api/http.js) which handles 401→refresh→retry single-flight.
+
+Frontend also has `frontend/src/workflow/` (visual workflow editor nodes/panels) and `frontend/src/screens/ComparisonsScreen.jsx` (report diff view).
 
 `pr_intelligence_python/`, `pr_intelligence_trusna/`, `dumps/`, `dump2-fe/`, `build/` are not part of the running app.
 

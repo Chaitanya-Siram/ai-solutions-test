@@ -39,7 +39,6 @@ predates that column has no lists and is judged by the LLM alone.
 """
 from __future__ import annotations
 
-import contextvars
 import json
 import re
 from concurrent.futures import ThreadPoolExecutor
@@ -47,7 +46,7 @@ from pathlib import Path
 from typing import Any
 
 from configs import envs, logger
-from ai_helpers.usage_tracking import record_usage
+from ai_helpers.usage_tracking import record_usage, worker_context
 from file_helpers.cleaing_data import get_domain
 
 _PROMPT_TEMPLATE = (Path(__file__).parent / "relevancy_prompt.txt").read_text(encoding="utf-8")
@@ -346,8 +345,8 @@ def _relevancy_batch(articles: list[dict[str, Any]], system_prompt: str) -> dict
     fail-open article carries no score — None, not 0, which would read as
     "judged irrelevant" downstream.
     """
-    ids = [a["id"] for a in articles]
     provider = envs.LLM_PROVIDER
+    ids = [a["id"] for a in articles]
     try:
         user_msg = _build_message(articles)
         if provider in _AZURE_ALIASES:
@@ -501,12 +500,16 @@ def apply_relevancy(
     if len(chunks) <= 1 or envs.LLM_CONCURRENCY <= 1:
         maps = [run(c) for c in chunks]
     else:
-        # ThreadPoolExecutor workers don't inherit the calling context on their
-        # own (unlike asyncio.to_thread), so the active UsageTracker — set via
-        # track_usage() by the caller — has to be carried in explicitly.
-        ctx = contextvars.copy_context()
+        # Use worker_context() instead of ctx.run() to avoid 'cannot enter
+        # context: already entered' when Langfuse/OTel instrumentation is
+        # active — sharing one ctx object across concurrent workers causes
+        # re-entrancy errors when a second thread enters the same context.
+        def _run_chunk(chunk):
+            with worker_context():
+                return run(chunk)
+
         with ThreadPoolExecutor(max_workers=min(envs.LLM_CONCURRENCY, len(chunks))) as pool:
-            maps = list(pool.map(lambda c: ctx.run(run, c), chunks))
+            maps = list(pool.map(_run_chunk, chunks))
 
     verdict: dict[str, tuple[bool, str, float | None]] = dict(prefiltered)
     for m in maps:

@@ -2,6 +2,7 @@ from typing import Any
 from anthropic import Anthropic
 from configs import envs, logger
 from ai_helpers.usage_tracking import record_usage
+from ai_helpers.langfuse_client import observe
 from .tagging_common import (
     TAG_TOOL_DESCRIPTION,
     TAG_TOOL_NAME,
@@ -33,6 +34,7 @@ def _extract_taggings(response: Any) -> list[dict[str, Any]]:
     raise ValueError(f"Claude did not return a {TAG_TOOL_NAME} tool call")
 
 
+@observe(as_type="generation", name="claude-tag-batch", capture_input=False, capture_output=False)
 def _tag_batch(
     articles: list[dict[str, Any]],
     brand_keywords: list[str],
@@ -67,6 +69,12 @@ def _tag_batch(
             response = stream.get_final_message()
         if response.usage:
             record_usage("claude", envs.CLAUDE_MODEL, response.usage.input_tokens, response.usage.output_tokens)
+            from langfuse import get_client as _lf_get_client
+            _lf_get_client().update_current_generation(
+                model=envs.CLAUDE_MODEL,
+                usage_details={"input": response.usage.input_tokens, "output": response.usage.output_tokens},
+                metadata={"articles_count": len(articles), "project": project_name},
+            )
         taggings = _extract_taggings(response)
     except Exception as exc:
         logger.error(f"Claude batch tagging failed for {len(articles)} articles: {exc}")
@@ -75,6 +83,7 @@ def _tag_batch(
     return align_taggings(ids, taggings)
 
 
+@observe(name="claude-tag-articles", capture_input=False, capture_output=False)
 def tag_articles(
     articles: list[dict[str, Any]],
     brand_keywords: list[str],
@@ -83,11 +92,16 @@ def tag_articles(
     project_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Tag with Claude. Schema depends on lens_label."""
+    from langfuse import get_client as _lf_get_client
+    _lf_get_client().update_current_span(
+        input={"articles_count": len(articles), "project": project_name},
+    )
     def batch_fn(batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return _tag_batch(batch, brand_keywords, competitor_keywords, sections_prompt, project_name)
     return run_in_batches(articles, batch_fn)
 
 
+@observe(name="claude-tag-articles-streaming", capture_input=False, capture_output=False)
 def tag_articles_streaming(
     articles: list[dict[str, Any]],
     brand_keywords: list[str],
@@ -97,6 +111,10 @@ def tag_articles_streaming(
     project_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Streaming variant: emits on_batch_done(payload) as each chunk finishes."""
+    from langfuse import get_client as _lf_get_client
+    _lf_get_client().update_current_span(
+        input={"articles_count": len(articles), "project": project_name},
+    )
     def batch_fn(batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return _tag_batch(batch, brand_keywords, competitor_keywords, sections_prompt, project_name)
     cb = on_batch_done if callable(on_batch_done) else (lambda _: None)

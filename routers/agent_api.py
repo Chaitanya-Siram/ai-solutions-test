@@ -25,6 +25,7 @@ from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 
+from agents.chart_generator.llm_client import track_usage
 from agents.chart_generator.chart_agent import (
     answer_question,
     chart_result_from_data,
@@ -36,6 +37,7 @@ from agents.chart_generator.chart_agent import (
 from agents.chart_generator.sandbox import run_chart_code
 from configs import logger
 from db_helpers.database import get_db
+from db_helpers.repository.llm_usage_db import save_usage as _save_llm_usage
 from db_helpers.repository.article_scope import scope_for_session
 from db_helpers.repository.sessions_db import get_session
 from db_helpers.repository.tagged_articles_db import list_tagged_articles
@@ -98,13 +100,20 @@ async def agent_stream(websocket: WebSocket, db: Session = Depends(get_db)) -> N
 
         await websocket.send_json({"type": "start", "session_id": session_id})
 
-        intent = await asyncio.to_thread(classify_intent, query)
-        await websocket.send_json({"type": "intent", "intent": intent})
+        with track_usage() as _agent_usage:
+            intent = await asyncio.to_thread(classify_intent, query)
+            await websocket.send_json({"type": "intent", "intent": intent})
 
-        if intent == "chart":
-            await _handle_chart(websocket, query, articles)
-        else:
-            await _handle_question(websocket, query, articles, record.charts_data_file)
+            if intent == "chart":
+                await _handle_chart(websocket, query, articles)
+            else:
+                await _handle_question(websocket, query, articles, record.charts_data_file)
+
+        try:
+            _save_llm_usage(db, record.project_id, session_id, "chart_agent",
+                            _agent_usage.input_tokens, _agent_usage.output_tokens, _agent_usage.cost_usd)
+        except Exception:
+            pass
 
     except WebSocketDisconnect:
         logger.info("Agent websocket disconnected by client")

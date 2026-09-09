@@ -41,6 +41,7 @@ def init_db() -> None:
     """
     from .models import (
         generated_query_model,
+        llm_usage_model,
         onedrive_files_model,
         project_model,
         raw_article_model,

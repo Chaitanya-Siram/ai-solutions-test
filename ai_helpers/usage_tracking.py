@@ -74,6 +74,26 @@ def track_usage():
         _usage_ctx.reset(token)
 
 
+@contextmanager
+def worker_context():
+    """Propagate the active UsageTracker into a ThreadPoolExecutor worker.
+
+    Use this instead of contextvars.copy_context().run() to avoid the
+    'cannot enter context: already entered' RuntimeError that occurs when
+    multiple workers share the same ctx object or when Langfuse/OTel
+    instrumentation re-enters a context that is already active.
+    """
+    tracker = _usage_ctx.get()
+    if tracker is None:
+        yield
+        return
+    token = _usage_ctx.set(tracker)
+    try:
+        yield
+    finally:
+        _usage_ctx.reset(token)
+
+
 def record_usage(provider: str, model: str, input_tokens: int, output_tokens: int) -> None:
     rates = PRICING.get(model)
     if rates is None:

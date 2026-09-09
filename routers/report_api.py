@@ -18,6 +18,8 @@ from reports_helpers.trane_report import build_media_monitoring_report as build_
 from reports_helpers.otsuka_report import build_media_monitoring_report as build_otsuka_report
 from reports_helpers.otsuka_report_2 import build_media_monitoring_report as build_otsuka_report2
 from agents.otsuka_report_agent.otsuka_report_synthesizer import synthesize_otsuka_report
+from agents.chart_generator.llm_client import track_usage
+from db_helpers.repository.llm_usage_db import save_usage as _save_llm_usage
 
 router = APIRouter(tags=["reports"])
 
@@ -90,7 +92,14 @@ def media_monitoring_report(
         elif "otsuka" in brand_lower:
             if variant == "summary":
                 # LLM-write the executive summary + per-article point-wise summaries.
-                synth = synthesize_otsuka_report(sections, brand_keywords, competitor_keywords)
+                with track_usage() as _otsuka_usage:
+                    synth = synthesize_otsuka_report(sections, brand_keywords, competitor_keywords)
+                try:
+                    _save_llm_usage(db, record.project_id, session_id, "otsuka_report_agent",
+                                    _otsuka_usage.input_tokens, _otsuka_usage.output_tokens,
+                                    _otsuka_usage.cost_usd)
+                except Exception:
+                    pass
                 doc_bytes = build_otsuka_report2(
                     synth["sections"],
                     brand=brand,

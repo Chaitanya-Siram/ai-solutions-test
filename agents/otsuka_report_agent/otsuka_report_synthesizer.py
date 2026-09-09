@@ -25,6 +25,7 @@ import json
 from pathlib import Path
 from typing import Any
 from configs import envs, logger
+from ai_helpers.usage_tracking import record_usage
 
 
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
@@ -207,6 +208,7 @@ def _call_claude(system_prompt, user_msg, tool_name, tool_description, parameter
         tool_choice={"type": "tool", "name": tool_name},
         messages=[{"role": "user", "content": user_msg}],
     )
+    record_usage("claude", envs.CLAUDE_MODEL, resp.usage.input_tokens, resp.usage.output_tokens)
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and block.name == tool_name:
             return dict(block.input)
@@ -243,6 +245,9 @@ def _call_azure(system_prompt, user_msg, tool_name, tool_description, parameters
     )
     if not completion.choices:
         raise ValueError(f"Azure OpenAI returned no choices for {tool_name}")
+    if completion.usage:
+        record_usage("azure_openai", envs.AZURE_OPENAI_MODEL,
+                     completion.usage.prompt_tokens, completion.usage.completion_tokens)
     tool_calls = getattr(completion.choices[0].message, "tool_calls", None) or []
     for call in tool_calls:
         if call.function.name == tool_name:

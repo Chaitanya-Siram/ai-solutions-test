@@ -1,8 +1,8 @@
 import json
 from typing import Any
-from openai import AzureOpenAI
 from configs import envs, logger
 from ai_helpers.usage_tracking import record_usage
+from ai_helpers.langfuse_client import observe, LangfuseAzureOpenAI
 from .tagging_common import (
     TAG_TOOL_DESCRIPTION,
     TAG_TOOL_NAME,
@@ -15,10 +15,10 @@ from .tagging_common import (
     run_in_batches_streaming,
 )
 
-_client: AzureOpenAI | None = None
+_client: LangfuseAzureOpenAI | None = None
 
 
-def _get_client() -> AzureOpenAI:
+def _get_client() -> LangfuseAzureOpenAI:
     global _client
     if _client is None:
         missing = [
@@ -32,7 +32,7 @@ def _get_client() -> AzureOpenAI:
         ]
         if missing:
             raise RuntimeError(f"Azure OpenAI is not configured. Missing: {', '.join(missing)}")
-        _client = AzureOpenAI(
+        _client = LangfuseAzureOpenAI(
             api_key=envs.AZURE_OPENAI_API_KEY,
             azure_endpoint=envs.AZURE_OPENAI_ENDPOINT,
             api_version=envs.AZURE_OPENAI_API_VERSION,
@@ -76,6 +76,8 @@ def _tag_batch(
     sections_prompt: str | None = None,
     project_name: str | None = None,
 ) -> list[dict[str, Any]]:
+    # LangfuseAzureOpenAI drop-in auto-instruments the completions call below:
+    # model name, tokens, prompt/response are captured without manual decoration.
     ids = [a["id"] for a in articles]
     client = _get_client()
     try:
@@ -103,6 +105,7 @@ def _tag_batch(
                     "name": TAG_TOOL_NAME
                 }
             },
+            langfuse_observation_id=None,  # let Langfuse generate; nests under parent span
         )
         if completion.usage:
             record_usage(
@@ -116,6 +119,7 @@ def _tag_batch(
     return align_taggings(ids, taggings)
 
 
+@observe(name="azure-tag-articles", capture_input=False, capture_output=False)
 def tag_articles(
     articles: list[dict[str, Any]],
     brand_keywords: list[str],
@@ -124,11 +128,16 @@ def tag_articles(
     project_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Tag with Azure OpenAI."""
+    from langfuse import get_client as _lf_get_client
+    _lf_get_client().update_current_span(
+        input={"articles_count": len(articles), "project": project_name},
+    )
     def batch_fn(batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return _tag_batch(batch, brand_keywords, competitor_keywords, sections_prompt, project_name)
     return run_in_batches(articles, batch_fn)
 
 
+@observe(name="azure-tag-articles-streaming", capture_input=False, capture_output=False)
 def tag_articles_streaming(
     articles: list[dict[str, Any]],
     brand_keywords: list[str],
@@ -138,6 +147,10 @@ def tag_articles_streaming(
     project_name: str | None = None,
 ) -> list[dict[str, Any]]:
     """Streaming variant: emits on_batch_done(payload) as each chunk finishes."""
+    from langfuse import get_client as _lf_get_client
+    _lf_get_client().update_current_span(
+        input={"articles_count": len(articles), "project": project_name},
+    )
     def batch_fn(batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
         return _tag_batch(batch, brand_keywords, competitor_keywords, sections_prompt, project_name)
     cb = on_batch_done if callable(on_batch_done) else (lambda _: None)

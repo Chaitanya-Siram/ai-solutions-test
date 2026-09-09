@@ -8,7 +8,7 @@ from db_helpers.database import init_db
 from routers import (
     upload_router, merge_router, tagging_router, charts_router, report_router, agent_router,
     project_router, session_router, query_builder_router, generated_query_router,
-    auth_router, user_router, onedrive_router, report_comparison_router
+    auth_router, user_router, onedrive_router, report_comparison_router, metrics_router
 )
 
 init_db()
@@ -61,3 +61,4 @@ app.include_router(query_builder_router, dependencies=_auth)
 app.include_router(generated_query_router, dependencies=_auth)
 app.include_router(onedrive_router, dependencies=_auth)
 app.include_router(report_comparison_router, dependencies=_auth)
+app.include_router(metrics_router, dependencies=_auth)

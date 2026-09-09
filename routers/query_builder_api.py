@@ -38,8 +38,21 @@ from configs import logger
 from db_helpers.database import SessionLocal
 from db_helpers.models.agent_state_model import AgentState
 from db_helpers.repository.generated_query_db import create_generated_query_record
+from db_helpers.repository.llm_usage_db import save_usage as _save_llm_usage
 
 router = APIRouter(tags=["query-builder"])
+
+
+def _persist_qb_usage(project_id: int | None, input_tokens: int, output_tokens: int, cost_usd: float) -> None:
+    if project_id is None or input_tokens == 0:
+        return
+    db = SessionLocal()
+    try:
+        _save_llm_usage(db, project_id, None, "query_builder", input_tokens, output_tokens, cost_usd)
+    except Exception:
+        pass
+    finally:
+        db.close()
 
 
 def _usage_payload(turn_usage: UsageTracker, session_totals: dict[str, float]) -> dict[str, Any]:
@@ -142,6 +155,7 @@ async def query_builder_stream(websocket: WebSocket) -> None:
         with track_usage() as usage:
             opening = await asyncio.to_thread(begin_session, state)
         await _emit_turn(websocket, state, opening, usage, session_totals)
+        await asyncio.to_thread(_persist_qb_usage, project_id, usage.input_tokens, usage.output_tokens, usage.cost_usd)
 
         while True:
             payload = await websocket.receive_json()
@@ -176,6 +190,7 @@ async def query_builder_stream(websocket: WebSocket) -> None:
             with track_usage() as usage:
                 result = await asyncio.to_thread(process_turn, state, message)
             await _emit_turn(websocket, state, result, usage, session_totals)
+            await asyncio.to_thread(_persist_qb_usage, project_id, usage.input_tokens, usage.output_tokens, usage.cost_usd)
 
     except WebSocketDisconnect:
         logger.info("Query-builder websocket disconnected by client")

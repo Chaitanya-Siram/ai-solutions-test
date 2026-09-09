@@ -66,6 +66,7 @@ from file_helpers.publication_helper import publication_name
 from file_helpers.s3_file import s3_file  # only the charts cache still lives on S3
 from file_helpers.similare_web_reach import get_reach
 from db_helpers.database import get_db
+from db_helpers.repository.llm_usage_db import save_usage as _save_llm_usage
 
 
 router = APIRouter(tags=["tagging"])
@@ -553,6 +554,11 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
                 apply_relevancy, articles, brand_keywords, competitor_keywords, relevancy_prompt, relevancy_domains
             )
         await websocket.send_json({"type": "usage", "step": "relevancy", **relevancy_usage.as_dict()})
+        try:
+            _save_llm_usage(db, session.project_id, session_id, "relevancy_agent",
+                            relevancy_usage.input_tokens, relevancy_usage.output_tokens, relevancy_usage.cost_usd)
+        except Exception:
+            pass
         await asyncio.to_thread(stamp_relevancy, db, scope, articles)
         articles = relevant
         if irrelevant:
@@ -640,6 +646,13 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
             tagging_usage_totals = tagging_usage.as_dict()
         else:
             llm_tagged = []
+        if tagging_usage_totals["input_tokens"] > 0:
+            try:
+                _save_llm_usage(db, session.project_id, session_id, "tagging_agent",
+                                tagging_usage_totals["input_tokens"], tagging_usage_totals["output_tokens"],
+                                tagging_usage_totals["cost_usd"])
+            except Exception:
+                pass
         logger.info(f"Tagging completed in {time.time() - started:.1f}s")
 
         # Combine freshly-tagged + reused tags (both keyed by this run's ids), then

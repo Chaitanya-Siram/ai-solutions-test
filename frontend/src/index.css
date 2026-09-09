@@ -4040,6 +4040,57 @@ select.wfinput { cursor: pointer; }
   font-size: 10.5px;
   padding: 2px 7px;
 }
+.tag--metrics {
+  color: #7c3aed;
+  background: color-mix(in srgb, #7c3aed 14%, transparent);
+  cursor: pointer;
+  border: none;
+  font-family: inherit;
+}
+.tag--metrics:hover {
+  background: color-mix(in srgb, #7c3aed 24%, transparent);
+}
+
+/* ---- metrics page ---- */
+.metric-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 24px;
+}
+.metric-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 20px 28px;
+  border-radius: 12px;
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  min-width: 160px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.metric-card:hover {
+  border-color: var(--accent);
+}
+.metric-card--active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface-1));
+}
+.metric-card__value {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text);
+  line-height: 1;
+}
+.metric-card__label {
+  font-size: 12px;
+  color: var(--text-soft);
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
 
 /* checkbox row in the edit modal */
 .field--row {

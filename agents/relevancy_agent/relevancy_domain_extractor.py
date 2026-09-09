@@ -23,6 +23,7 @@ import json
 from typing import Any
 
 from configs import envs, logger
+from ai_helpers.usage_tracking import record_usage
 
 from .relevancy_agent import (
     _AZURE_ALIASES,
@@ -90,6 +91,7 @@ def _call_claude(user_msg: str) -> dict[str, Any]:
         tool_choice={"type": "tool", "name": _TOOL_NAME},
         messages=[{"role": "user", "content": user_msg}],
     )
+    record_usage("claude", envs.CLAUDE_MODEL, resp.usage.input_tokens, resp.usage.output_tokens)
     for block in resp.content:
         if getattr(block, "type", None) == "tool_use" and block.name == _TOOL_NAME:
             return dict(block.input)
@@ -126,6 +128,9 @@ def _call_azure(user_msg: str) -> dict[str, Any]:
     )
     if not completion.choices:
         raise ValueError("Azure OpenAI returned no choices for domain extraction")
+    if completion.usage:
+        record_usage("azure_openai", envs.AZURE_OPENAI_MODEL,
+                     completion.usage.prompt_tokens, completion.usage.completion_tokens)
     for call in getattr(completion.choices[0].message, "tool_calls", None) or []:
         if call.function.name == _TOOL_NAME:
             return json.loads(call.function.arguments or "{}")

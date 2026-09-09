@@ -95,6 +95,7 @@ export default function UsersScreen() {
                 <th>Email</th>
                 <th>Role</th>
                 <th>Status</th>
+                <th>Activity</th>
                 <th aria-label="Actions" />
               </tr>
             </thead>
@@ -125,6 +126,14 @@ export default function UsersScreen() {
                     <span className={`tag ${u.is_active ? 'tag--active' : 'tag--inactive'}`}>
                       {u.is_active ? 'Active' : 'Inactive'}
                     </span>
+                  </td>
+                  <td>
+                    <button
+                      className="tag tag--metrics"
+                      onClick={() => navigate(paths.userMetrics(u.full_name || u.email))}
+                    >
+                      Metrics
+                    </button>
                   </td>
                   <td className="table__actions">
                     <button className="btn btn--ghost btn--mini" onClick={() => setEditing(u)}>

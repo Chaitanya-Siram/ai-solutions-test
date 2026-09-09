@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from agents.relevancy_agent.relevancy_domain_extractor import extract_relevancy_domains
 from agents.section_fetcher.sections_helper import extract_section_names
+from agents.chart_generator.llm_client import track_usage
+from db_helpers.repository.llm_usage_db import save_usage as _save_llm_usage
 from configs import logger
 from db_helpers.database import get_db
 from db_helpers.repository.projects_db import (
@@ -169,7 +171,16 @@ def add_sections_prompt(
     if project is None:
         raise HTTPException(status_code=404, detail="Project not found.")
 
-    sections_orders = extract_section_names(payload.sections_prompt) if payload.sections_prompt else None
+    if payload.sections_prompt:
+        with track_usage() as _sec_usage:
+            sections_orders = extract_section_names(payload.sections_prompt)
+        try:
+            _save_llm_usage(db, project_id, None, "section_fetcher",
+                            _sec_usage.input_tokens, _sec_usage.output_tokens, _sec_usage.cost_usd)
+        except Exception:
+            pass
+    else:
+        sections_orders = None
     project = set_sections_prompt(db, project, payload.sections_prompt, sections_orders)
     logger.info(f"Updated sections prompt for project id={project_id}; sections={sections_orders}")
     return project
@@ -190,7 +201,16 @@ def add_relevancy_prompt(
         raise HTTPException(status_code=404, detail="Project not found.")
 
     prompt = payload.relevancy_prompt.strip() if payload.relevancy_prompt else None
-    domains = extract_relevancy_domains(prompt) if prompt else None
+    if prompt:
+        with track_usage() as _dom_usage:
+            domains = extract_relevancy_domains(prompt)
+        try:
+            _save_llm_usage(db, project_id, None, "relevancy_domain_extractor",
+                            _dom_usage.input_tokens, _dom_usage.output_tokens, _dom_usage.cost_usd)
+        except Exception:
+            pass
+    else:
+        domains = None
     project = set_relevancy_prompt(db, project, prompt, domains)
     logger.info(
         f"Updated relevancy prompt for project id={project_id} (set={bool(prompt)}); "

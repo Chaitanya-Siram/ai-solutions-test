@@ -12,6 +12,7 @@ from .onedrive_api import router as onedrive_router
 from .report_comparison_api import router as report_comparison_router
 from .auth_api import router as auth_router
 from .user_api import router as user_router
+from .metrics_api import router as metrics_router
 
 __all__ = [
     "upload_router",
@@ -28,4 +29,5 @@ __all__ = [
     "report_comparison_router",
     "auth_router",
     "user_router",
+    "metrics_router",
 ]
