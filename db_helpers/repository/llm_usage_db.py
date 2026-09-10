@@ -1,4 +1,6 @@
-from sqlalchemy import func
+from datetime import datetime, timedelta, timezone
+
+from sqlalchemy import cast, func, Date
 from sqlalchemy.orm import Session
 
 from db_helpers.models.generated_query_model import GeneratedQueryModel
@@ -30,16 +32,34 @@ def save_usage(
     db.commit()
 
 
-def get_metrics_summary(db: Session) -> dict:
+def _apply_date_filter(query, start_date: str | None, end_date: str | None):
+    if start_date:
+        try:
+            dt = datetime.fromisoformat(start_date).replace(tzinfo=timezone.utc)
+            query = query.filter(LlmUsageModel.created_at >= dt)
+        except ValueError:
+            pass
+    if end_date:
+        try:
+            dt = datetime.fromisoformat(end_date).replace(tzinfo=timezone.utc) + timedelta(days=1)
+            query = query.filter(LlmUsageModel.created_at < dt)
+        except ValueError:
+            pass
+    return query
+
+
+def get_metrics_summary(db: Session, start_date: str | None = None, end_date: str | None = None) -> dict:
     projects = db.query(ProjectModel).count()
     sessions = db.query(SessionModel).count()
     generated_queries = db.query(GeneratedQueryModel).count()
 
-    totals = db.query(
+    q = db.query(
         func.coalesce(func.sum(LlmUsageModel.cost_usd), 0.0).label("total_cost_usd"),
         func.coalesce(func.sum(LlmUsageModel.input_tokens), 0).label("total_input_tokens"),
         func.coalesce(func.sum(LlmUsageModel.output_tokens), 0).label("total_output_tokens"),
-    ).one()
+    )
+    q = _apply_date_filter(q, start_date, end_date)
+    totals = q.one()
 
     return {
         "projects": projects,
@@ -100,6 +120,82 @@ def list_sessions_with_usage(db: Session) -> list[dict]:
             "agents": [a[0] for a in agents],
         })
     return result
+
+
+def get_daily_usage(db: Session, days: int = 14, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+    q = db.query(
+        cast(LlmUsageModel.created_at, Date).label("day"),
+        func.sum(LlmUsageModel.input_tokens).label("input_tokens"),
+        func.sum(LlmUsageModel.output_tokens).label("output_tokens"),
+        func.sum(LlmUsageModel.cost_usd).label("cost_usd"),
+    )
+    if start_date or end_date:
+        q = _apply_date_filter(q, start_date, end_date)
+    else:
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        q = q.filter(LlmUsageModel.created_at >= cutoff)
+    rows = (
+        q.group_by(cast(LlmUsageModel.created_at, Date))
+        .order_by(cast(LlmUsageModel.created_at, Date))
+        .all()
+    )
+    return [
+        {
+            "date": str(r.day),
+            "input_tokens": int(r.input_tokens),
+            "output_tokens": int(r.output_tokens),
+            "total_tokens": int(r.input_tokens) + int(r.output_tokens),
+            "cost_usd": float(r.cost_usd),
+        }
+        for r in rows
+    ]
+
+
+def get_agent_totals(db: Session, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+    q = db.query(
+        LlmUsageModel.agent_name,
+        func.sum(LlmUsageModel.input_tokens).label("input_tokens"),
+        func.sum(LlmUsageModel.output_tokens).label("output_tokens"),
+        func.sum(LlmUsageModel.cost_usd).label("cost_usd"),
+    )
+    q = _apply_date_filter(q, start_date, end_date)
+    rows = (
+        q.group_by(LlmUsageModel.agent_name)
+        .order_by(func.sum(LlmUsageModel.input_tokens + LlmUsageModel.output_tokens).desc())
+        .all()
+    )
+    return [
+        {
+            "agent_name": r.agent_name,
+            "input_tokens": int(r.input_tokens),
+            "output_tokens": int(r.output_tokens),
+            "total_tokens": int(r.input_tokens) + int(r.output_tokens),
+            "cost_usd": float(r.cost_usd),
+        }
+        for r in rows
+    ]
+
+
+def get_model_totals(db: Session, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+    q = db.query(
+        func.coalesce(LlmUsageModel.model, "unknown").label("model"),
+        func.sum(LlmUsageModel.input_tokens + LlmUsageModel.output_tokens).label("total_tokens"),
+        func.sum(LlmUsageModel.cost_usd).label("cost_usd"),
+    )
+    q = _apply_date_filter(q, start_date, end_date)
+    rows = (
+        q.group_by(func.coalesce(LlmUsageModel.model, "unknown"))
+        .order_by(func.sum(LlmUsageModel.cost_usd).desc())
+        .all()
+    )
+    return [
+        {
+            "model": r.model,
+            "total_tokens": int(r.total_tokens),
+            "cost_usd": float(r.cost_usd),
+        }
+        for r in rows
+    ]
 
 
 def get_session_agent_breakdown(db: Session, session_id: int) -> list[dict]:

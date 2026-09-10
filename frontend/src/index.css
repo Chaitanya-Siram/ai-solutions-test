@@ -4051,46 +4051,185 @@ select.wfinput { cursor: pointer; }
   background: color-mix(in srgb, #7c3aed 24%, transparent);
 }
 
-/* ---- metrics page ---- */
-.metric-cards {
+/* ---- metrics dashboard ---- */
+.dash-header {
   display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
   flex-wrap: wrap;
-  gap: 16px;
-  margin-top: 24px;
 }
-.metric-card {
+
+.dash-filter {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
+  gap: 8px;
+}
+.dash-filter__presets {
+  display: flex;
   gap: 4px;
-  padding: 20px 28px;
-  border-radius: 12px;
-  background: var(--surface-1);
+  background: var(--surface-2);
   border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+}
+.dash-filter__preset {
+  padding: 5px 12px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  min-width: 160px;
-  transition: border-color 0.15s, background 0.15s;
+  transition: background 0.12s, color 0.12s;
+  font-family: inherit;
 }
-.metric-card:hover {
-  border-color: var(--accent);
+.dash-filter__preset:hover { color: var(--text); background: var(--surface); }
+.dash-filter__preset--on { background: var(--surface); color: var(--accent-2); font-weight: 600; }
+.dash-filter__custom {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: var(--text-soft);
 }
-.metric-card--active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, var(--surface-1));
+.dash-filter__custom label { display: flex; align-items: center; gap: 6px; }
+.dash-filter__custom input[type=date] {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  padding: 4px 8px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
 }
-.metric-card__value {
-  font-size: 28px;
+
+.dash-summary-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.dash-summary-card {
+  flex: 1 1 140px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 18px 22px;
+}
+.dash-summary-card__label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-soft);
+  margin-bottom: 6px;
+}
+.dash-summary-card__value {
+  font-size: 26px;
   font-weight: 700;
   color: var(--text);
-  line-height: 1;
+  line-height: 1.1;
 }
-.metric-card__label {
+.dash-summary-card__sub {
   font-size: 12px;
   color: var(--text-soft);
-  font-weight: 500;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  margin-top: 4px;
 }
+
+.dash-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 22px 24px;
+  margin-bottom: 16px;
+}
+.dash-section-head { margin-bottom: 14px; }
+.dash-section-head__title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 2px;
+}
+.dash-section-head__sub {
+  font-size: 12px;
+  color: var(--text-soft);
+  margin: 0;
+}
+
+.dash-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+@media (max-width: 760px) { .dash-two-col { grid-template-columns: 1fr; } }
+
+.dash-model-list { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.dash-model-row { display: flex; align-items: center; gap: 12px; }
+.dash-model-row__name { font-size: 13px; color: var(--text-soft); min-width: 120px; }
+.dash-model-row__bar-wrap { flex: 1; height: 8px; background: var(--surface-2); border-radius: 4px; overflow: hidden; }
+.dash-model-row__bar { height: 100%; background: #6366f1; border-radius: 4px; transition: width 0.4s; }
+.dash-model-row__cost { font-size: 13px; font-weight: 600; color: var(--text); min-width: 72px; text-align: right; }
+
+.dash-agent-list { display: flex; flex-direction: column; gap: 6px; }
+.dash-agent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+}
+.dash-agent-row__left { display: flex; align-items: center; gap: 10px; }
+.dash-agent-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dash-agent-dot--on { background: #22c55e; }
+.dash-agent-dot--warn { background: #f59e0b; }
+.dash-agent-dot--off { background: var(--text-soft); }
+.dash-agent-row__name { font-size: 13px; font-weight: 500; color: var(--text); }
+.dash-agent-row__key { font-size: 11px; color: var(--text-soft); }
+.dash-agent-row__right { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; }
+.dash-agent-row__tokens { font-size: 12px; color: #6366f1; font-weight: 600; }
+.dash-agent-row__cost { font-size: 11px; color: var(--text-soft); }
+
+.dash-tooltip {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  box-shadow: var(--shadow);
+}
+.dash-tooltip__label { font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.dash-tooltip__row { display: flex; justify-content: space-between; gap: 24px; color: var(--text-soft); }
+
+.dash-empty { color: var(--text-soft); font-size: 13px; padding: 8px 0; }
+
+.dash-link {
+  background: none;
+  border: none;
+  color: var(--accent-2);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+.dash-link:hover { text-decoration: underline; }
+
+/* keep old metric-cards (still referenced from metric-card--active if anywhere) */
+.metric-cards { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 24px; }
+.metric-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+  padding: 20px 28px; border-radius: 12px; background: var(--surface-1);
+  border: 1px solid var(--border); cursor: pointer; min-width: 160px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.metric-card:hover { border-color: var(--accent); }
+.metric-card--active { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface-1)); }
+.metric-card__value { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; }
+.metric-card__label { font-size: 12px; color: var(--text-soft); font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em; }
 
 /* checkbox row in the edit modal */
 .field--row {

@@ -11,6 +11,7 @@ import WorkflowScreen from './screens/WorkflowScreen.jsx'
 import LoginScreen from './screens/LoginScreen.jsx'
 import UsersScreen from './screens/UsersScreen.jsx'
 import UserMetricsScreen from './screens/UserMetricsScreen.jsx'
+import UserMetricsAgentsScreen from './screens/UserMetricsAgentsScreen.jsx'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
 import { BellIcon, MoonIcon, SunIcon } from './components/Icons.jsx'
 import { paths, loadProject, loadSession, useResolved, useCharts, seedCharts } from './router/nav.js'
@@ -186,6 +187,15 @@ function UserMetricsRoute() {
   return (
     <Shell wide>
       <UserMetricsScreen />
+    </Shell>
+  )
+}
+
+/* ---------- user metrics agents route ---------- */
+function UserMetricsAgentsRoute() {
+  return (
+    <Shell wide>
+      <UserMetricsAgentsScreen />
     </Shell>
   )
 }
@@ -398,6 +408,7 @@ export default function App() {
             <Route path="/" element={<RequireAuth><ProjectsRoute /></RequireAuth>} />
             <Route path="/users" element={<RequireAuth><UsersRoute /></RequireAuth>} />
             <Route path="/users/:userId/metrics" element={<RequireAuth><UserMetricsRoute /></RequireAuth>} />
+            <Route path="/users/:userId/metrics/agents" element={<RequireAuth><UserMetricsAgentsRoute /></RequireAuth>} />
             <Route path="/:projectId/sessions" element={<RequireAuth><ProjectRoute /></RequireAuth>} />
             <Route path="/:projectId/comparisons" element={<RequireAuth><ComparisonsRoute /></RequireAuth>} />
             <Route path="/:projectId/sessions/:sessionId/workflow" element={<RequireAuth><WorkflowRoute /></RequireAuth>} />

@@ -13,6 +13,7 @@ export const paths = {
   login: () => '/login',
   users: () => '/users',
   userMetrics: (userId) => `/users/${encodeURIComponent(userId)}/metrics`,
+  userMetricsAgents: (userId) => `/users/${encodeURIComponent(userId)}/metrics/agents`,
   projects: () => '/',
   project: (pid) => `/${pid}/sessions`,
   comparisons: (pid) => `/${pid}/comparisons`,
