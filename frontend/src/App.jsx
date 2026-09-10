@@ -12,6 +12,8 @@ import LoginScreen from './screens/LoginScreen.jsx'
 import UsersScreen from './screens/UsersScreen.jsx'
 import UserMetricsScreen from './screens/UserMetricsScreen.jsx'
 import UserMetricsAgentsScreen from './screens/UserMetricsAgentsScreen.jsx'
+import UserMetricsProjectsScreen from './screens/UserMetricsProjectsScreen.jsx'
+import UserMetricsProjectScreen from './screens/UserMetricsProjectScreen.jsx'
 import { AuthProvider, useAuth } from './auth/AuthContext.jsx'
 import { BellIcon, MoonIcon, SunIcon } from './components/Icons.jsx'
 import { paths, loadProject, loadSession, useResolved, useCharts, seedCharts } from './router/nav.js'
@@ -196,6 +198,24 @@ function UserMetricsAgentsRoute() {
   return (
     <Shell wide>
       <UserMetricsAgentsScreen />
+    </Shell>
+  )
+}
+
+/* ---------- user metrics projects list route ---------- */
+function UserMetricsProjectsRoute() {
+  return (
+    <Shell wide>
+      <UserMetricsProjectsScreen />
+    </Shell>
+  )
+}
+
+/* ---------- user metrics single project route ---------- */
+function UserMetricsProjectRoute() {
+  return (
+    <Shell wide>
+      <UserMetricsProjectScreen />
     </Shell>
   )
 }
@@ -409,6 +429,8 @@ export default function App() {
             <Route path="/users" element={<RequireAuth><UsersRoute /></RequireAuth>} />
             <Route path="/users/:userId/metrics" element={<RequireAuth><UserMetricsRoute /></RequireAuth>} />
             <Route path="/users/:userId/metrics/agents" element={<RequireAuth><UserMetricsAgentsRoute /></RequireAuth>} />
+            <Route path="/users/:userId/metrics/projects" element={<RequireAuth><UserMetricsProjectsRoute /></RequireAuth>} />
+            <Route path="/users/:userId/metrics/projects/:projectId" element={<RequireAuth><UserMetricsProjectRoute /></RequireAuth>} />
             <Route path="/:projectId/sessions" element={<RequireAuth><ProjectRoute /></RequireAuth>} />
             <Route path="/:projectId/comparisons" element={<RequireAuth><ComparisonsRoute /></RequireAuth>} />
             <Route path="/:projectId/sessions/:sessionId/workflow" element={<RequireAuth><WorkflowRoute /></RequireAuth>} />

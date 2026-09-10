@@ -8,6 +8,7 @@ from db_helpers.repository.llm_usage_db import (
     get_daily_usage,
     get_agent_totals,
     get_model_totals,
+    get_projects_with_usage,
 )
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
@@ -17,9 +18,10 @@ router = APIRouter(prefix="/metrics", tags=["metrics"])
 def metrics_summary(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    project_id: int | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    return get_metrics_summary(db, start_date=start_date, end_date=end_date)
+    return get_metrics_summary(db, start_date=start_date, end_date=end_date, project_id=project_id)
 
 
 @router.get("/daily")
@@ -27,27 +29,35 @@ def metrics_daily(
     days: int = Query(14, ge=1, le=365),
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    project_id: int | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    return get_daily_usage(db, days=days, start_date=start_date, end_date=end_date)
+    return get_daily_usage(db, days=days, start_date=start_date, end_date=end_date, project_id=project_id)
 
 
 @router.get("/agents")
 def metrics_agents(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    project_id: int | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    return get_agent_totals(db, start_date=start_date, end_date=end_date)
+    return get_agent_totals(db, start_date=start_date, end_date=end_date, project_id=project_id)
 
 
 @router.get("/models")
 def metrics_models(
     start_date: str | None = Query(None),
     end_date: str | None = Query(None),
+    project_id: int | None = Query(None),
     db: Session = Depends(get_db),
 ):
-    return get_model_totals(db, start_date=start_date, end_date=end_date)
+    return get_model_totals(db, start_date=start_date, end_date=end_date, project_id=project_id)
+
+
+@router.get("/projects")
+def metrics_projects(db: Session = Depends(get_db)):
+    return get_projects_with_usage(db)
 
 
 @router.get("/sessions")

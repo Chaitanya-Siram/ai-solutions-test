@@ -9,5 +9,6 @@ export const getMetricsSummary = (params = {}) => apiJson('/metrics/summary' + q
 export const getMetricsDaily = (params = {}) => apiJson('/metrics/daily' + qs(params))
 export const getMetricsAgents = (params = {}) => apiJson('/metrics/agents' + qs(params))
 export const getMetricsModels = (params = {}) => apiJson('/metrics/models' + qs(params))
+export const getMetricsProjects = () => apiJson('/metrics/projects')
 export const getMetricsSessions = () => apiJson('/metrics/sessions')
 export const getSessionDetail = (sessionId) => apiJson(`/metrics/sessions/${sessionId}`)

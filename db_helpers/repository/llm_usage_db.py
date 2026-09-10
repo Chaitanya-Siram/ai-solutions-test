@@ -48,9 +48,24 @@ def _apply_date_filter(query, start_date: str | None, end_date: str | None):
     return query
 
 
-def get_metrics_summary(db: Session, start_date: str | None = None, end_date: str | None = None) -> dict:
-    projects = db.query(ProjectModel).count()
-    sessions = db.query(SessionModel).count()
+def _apply_project_filter(query, project_id: int | None):
+    if project_id is not None:
+        query = query.filter(LlmUsageModel.project_id == project_id)
+    return query
+
+
+def get_metrics_summary(
+    db: Session,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    project_id: int | None = None,
+) -> dict:
+    if project_id is not None:
+        projects = 1
+        sessions = db.query(SessionModel).filter(SessionModel.project_id == project_id).count()
+    else:
+        projects = db.query(ProjectModel).count()
+        sessions = db.query(SessionModel).count()
     generated_queries = db.query(GeneratedQueryModel).count()
 
     q = db.query(
@@ -58,6 +73,7 @@ def get_metrics_summary(db: Session, start_date: str | None = None, end_date: st
         func.coalesce(func.sum(LlmUsageModel.input_tokens), 0).label("total_input_tokens"),
         func.coalesce(func.sum(LlmUsageModel.output_tokens), 0).label("total_output_tokens"),
     )
+    q = _apply_project_filter(q, project_id)
     q = _apply_date_filter(q, start_date, end_date)
     totals = q.one()
 
@@ -122,13 +138,20 @@ def list_sessions_with_usage(db: Session) -> list[dict]:
     return result
 
 
-def get_daily_usage(db: Session, days: int = 14, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+def get_daily_usage(
+    db: Session,
+    days: int = 14,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    project_id: int | None = None,
+) -> list[dict]:
     q = db.query(
         cast(LlmUsageModel.created_at, Date).label("day"),
         func.sum(LlmUsageModel.input_tokens).label("input_tokens"),
         func.sum(LlmUsageModel.output_tokens).label("output_tokens"),
         func.sum(LlmUsageModel.cost_usd).label("cost_usd"),
     )
+    q = _apply_project_filter(q, project_id)
     if start_date or end_date:
         q = _apply_date_filter(q, start_date, end_date)
     else:
@@ -151,13 +174,19 @@ def get_daily_usage(db: Session, days: int = 14, start_date: str | None = None, 
     ]
 
 
-def get_agent_totals(db: Session, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+def get_agent_totals(
+    db: Session,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    project_id: int | None = None,
+) -> list[dict]:
     q = db.query(
         LlmUsageModel.agent_name,
         func.sum(LlmUsageModel.input_tokens).label("input_tokens"),
         func.sum(LlmUsageModel.output_tokens).label("output_tokens"),
         func.sum(LlmUsageModel.cost_usd).label("cost_usd"),
     )
+    q = _apply_project_filter(q, project_id)
     q = _apply_date_filter(q, start_date, end_date)
     rows = (
         q.group_by(LlmUsageModel.agent_name)
@@ -176,12 +205,18 @@ def get_agent_totals(db: Session, start_date: str | None = None, end_date: str |
     ]
 
 
-def get_model_totals(db: Session, start_date: str | None = None, end_date: str | None = None) -> list[dict]:
+def get_model_totals(
+    db: Session,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    project_id: int | None = None,
+) -> list[dict]:
     q = db.query(
         func.coalesce(LlmUsageModel.model, "unknown").label("model"),
         func.sum(LlmUsageModel.input_tokens + LlmUsageModel.output_tokens).label("total_tokens"),
         func.sum(LlmUsageModel.cost_usd).label("cost_usd"),
     )
+    q = _apply_project_filter(q, project_id)
     q = _apply_date_filter(q, start_date, end_date)
     rows = (
         q.group_by(func.coalesce(LlmUsageModel.model, "unknown"))
@@ -193,6 +228,35 @@ def get_model_totals(db: Session, start_date: str | None = None, end_date: str |
             "model": r.model,
             "total_tokens": int(r.total_tokens),
             "cost_usd": float(r.cost_usd),
+        }
+        for r in rows
+    ]
+
+
+def get_projects_with_usage(db: Session) -> list[dict]:
+    rows = (
+        db.query(
+            ProjectModel.id,
+            ProjectModel.name,
+            func.coalesce(func.sum(LlmUsageModel.input_tokens), 0).label("input_tokens"),
+            func.coalesce(func.sum(LlmUsageModel.output_tokens), 0).label("output_tokens"),
+            func.coalesce(func.sum(LlmUsageModel.cost_usd), 0.0).label("cost_usd"),
+            func.count(func.distinct(LlmUsageModel.agent_name)).label("agent_count"),
+        )
+        .outerjoin(LlmUsageModel, LlmUsageModel.project_id == ProjectModel.id)
+        .group_by(ProjectModel.id, ProjectModel.name)
+        .order_by(ProjectModel.id)
+        .all()
+    )
+    return [
+        {
+            "id": r.id,
+            "name": r.name,
+            "input_tokens": int(r.input_tokens),
+            "output_tokens": int(r.output_tokens),
+            "total_tokens": int(r.input_tokens) + int(r.output_tokens),
+            "cost_usd": float(r.cost_usd),
+            "agent_count": int(r.agent_count),
         }
         for r in rows
     ]
