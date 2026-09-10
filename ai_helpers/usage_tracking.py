@@ -23,8 +23,21 @@ from configs import logger
 # $ per 1M tokens (input, output). Update if the deployed model or its list price
 # changes — this is a static table, not fetched from either provider.
 PRICING: dict[str, tuple[float, float]] = {
+    # Claude
     "claude-sonnet-4-5": (3.00, 15.00),
+    "claude-sonnet-4-6": (3.00, 15.00),
+    "claude-opus-4": (15.00, 75.00),
+    "claude-haiku-4-5": (0.80, 4.00),
+    "claude-3-5-sonnet-20241022": (3.00, 15.00),
+    "claude-3-7-sonnet-20250219": (3.00, 15.00),
+    # Azure OpenAI / OpenAI
     "gpt-4.1": (2.00, 8.00),
+    "gpt-4.1-mini": (0.40, 1.60),
+    "gpt-4o": (2.50, 10.00),
+    "gpt-4o-mini": (0.15, 0.60),
+    "gpt-4": (30.00, 60.00),
+    "gpt-4-turbo": (10.00, 30.00),
+    "gpt-35-turbo": (0.50, 1.50),
 }
 
 _usage_ctx: contextvars.ContextVar["UsageTracker | None"] = contextvars.ContextVar(
@@ -54,6 +67,13 @@ class UsageTracker:
     @property
     def cost_usd(self) -> float:
         return sum(c["cost_usd"] for c in self.calls)
+
+    @property
+    def primary_model(self) -> str | None:
+        if not self.calls:
+            return None
+        models = [c["model"] for c in self.calls]
+        return max(set(models), key=models.count)
 
     def as_dict(self) -> dict[str, Any]:
         return {

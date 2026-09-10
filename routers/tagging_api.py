@@ -204,9 +204,21 @@ def tag_new_pool_articles(
     # Same steps as the full run, over the new articles only: relevancy gate, reach
     # enrichment, then link so syndicated copies inherit tags instead of being sent
     # to the model.
-    relevant, irrelevant = apply_relevancy(
-        articles, brand_keywords, competitor_keywords, relevancy_prompt, relevancy_domains
-    )
+    with track_usage() as _pool_relevancy_usage:
+        relevant, irrelevant = apply_relevancy(
+            articles, brand_keywords, competitor_keywords, relevancy_prompt, relevancy_domains
+        )
+    if _pool_relevancy_usage.input_tokens > 0:
+        try:
+            _save_llm_usage(
+                db, project_id, None, "relevancy_agent",
+                _pool_relevancy_usage.input_tokens,
+                _pool_relevancy_usage.output_tokens,
+                _pool_relevancy_usage.cost_usd,
+                model=_pool_relevancy_usage.primary_model,
+            )
+        except Exception:
+            pass
     stamp_relevancy(db, scope, articles)
     articles = get_reach(relevant)
 
@@ -220,18 +232,30 @@ def tag_new_pool_articles(
         f"their main's tags; {len(irrelevant)} irrelevant"
     )
     started = time.time()
-    if not non_copies:
-        llm_tagged = []
-    elif on_batch_done is not None:
-        llm_tagged = tag_articles_streaming(
-            non_copies, brand_keywords, competitor_keywords, sections_prompt, on_batch_done,
-            project_name=project_name,
-        )
-    else:
-        llm_tagged = tag_articles(
-            non_copies, brand_keywords, competitor_keywords, sections_prompt=sections_prompt,
-            project_name=project_name,
-        )
+    with track_usage() as _pool_tagging_usage:
+        if not non_copies:
+            llm_tagged = []
+        elif on_batch_done is not None:
+            llm_tagged = tag_articles_streaming(
+                non_copies, brand_keywords, competitor_keywords, sections_prompt, on_batch_done,
+                project_name=project_name,
+            )
+        else:
+            llm_tagged = tag_articles(
+                non_copies, brand_keywords, competitor_keywords, sections_prompt=sections_prompt,
+                project_name=project_name,
+            )
+    if _pool_tagging_usage.input_tokens > 0:
+        try:
+            _save_llm_usage(
+                db, project_id, None, "tagging_agent",
+                _pool_tagging_usage.input_tokens,
+                _pool_tagging_usage.output_tokens,
+                _pool_tagging_usage.cost_usd,
+                model=_pool_tagging_usage.primary_model,
+            )
+        except Exception:
+            pass
     logger.info(f"Pool tagging completed in {time.time() - started:.1f}s")
 
     tagged_full = merge_tagged_with_syndication(non_copies, copies, copy_to_main, llm_tagged)
@@ -554,11 +578,15 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
                 apply_relevancy, articles, brand_keywords, competitor_keywords, relevancy_prompt, relevancy_domains
             )
         await websocket.send_json({"type": "usage", "step": "relevancy", **relevancy_usage.as_dict()})
-        try:
-            _save_llm_usage(db, session.project_id, session_id, "relevancy_agent",
-                            relevancy_usage.input_tokens, relevancy_usage.output_tokens, relevancy_usage.cost_usd)
-        except Exception:
-            pass
+        if relevancy_usage.input_tokens > 0:
+            try:
+                _save_llm_usage(
+                    db, session.project_id, session_id, "relevancy_agent",
+                    relevancy_usage.input_tokens, relevancy_usage.output_tokens, relevancy_usage.cost_usd,
+                    model=relevancy_usage.primary_model,
+                )
+            except Exception:
+                pass
         await asyncio.to_thread(stamp_relevancy, db, scope, articles)
         articles = relevant
         if irrelevant:
@@ -648,9 +676,12 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
             llm_tagged = []
         if tagging_usage_totals["input_tokens"] > 0:
             try:
-                _save_llm_usage(db, session.project_id, session_id, "tagging_agent",
-                                tagging_usage_totals["input_tokens"], tagging_usage_totals["output_tokens"],
-                                tagging_usage_totals["cost_usd"])
+                _save_llm_usage(
+                    db, session.project_id, session_id, "tagging_agent",
+                    tagging_usage_totals["input_tokens"], tagging_usage_totals["output_tokens"],
+                    tagging_usage_totals["cost_usd"],
+                    model=tagging_usage.primary_model,
+                )
             except Exception:
                 pass
         logger.info(f"Tagging completed in {time.time() - started:.1f}s")
