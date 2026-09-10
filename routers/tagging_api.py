@@ -624,6 +624,15 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
             f"Tagging {len(to_tag)} articles; reusing {len(reused)} already-tagged; "
             f"{len(syndications)} syndicated copies inherit their main's tags"
         )
+        await websocket.send_json({
+            "type": "progress",
+            "message": (
+                f"Tagging {len(to_tag)} article(s) with LLM"
+                + (f"; reusing {len(reused)} already-tagged" if reused else "")
+                + (f"; {len(syndications)} syndicated copies inherit tags" if syndications else "")
+                + "…"
+            ),
+        })
         if reused:
             await websocket.send_json(
                 {"type": "progress", "message": f"Reusing tags for {len(reused)} already-tagged article(s)…"}
@@ -672,6 +681,7 @@ async def tagging_stream(websocket: WebSocket, db: Session = Depends(get_db)) ->
 
                 llm_tagged = await task  # re-raise any exception from the tagging thread
             tagging_usage_totals = tagging_usage.as_dict()
+            logger.info(f"[USAGE] tagging tracker after task: input={tagging_usage.input_tokens} output={tagging_usage.output_tokens} calls={len(tagging_usage.calls)}")
         else:
             llm_tagged = []
         if tagging_usage_totals["input_tokens"] > 0:

@@ -46,7 +46,7 @@ from pathlib import Path
 from typing import Any
 
 from configs import envs, logger
-from ai_helpers.usage_tracking import record_usage, worker_context
+from ai_helpers.usage_tracking import record_usage, _usage_ctx
 from file_helpers.cleaing_data import get_domain
 
 _PROMPT_TEMPLATE = (Path(__file__).parent / "relevancy_prompt.txt").read_text(encoding="utf-8")
@@ -500,13 +500,18 @@ def apply_relevancy(
     if len(chunks) <= 1 or envs.LLM_CONCURRENCY <= 1:
         maps = [run(c) for c in chunks]
     else:
-        # Use worker_context() instead of ctx.run() to avoid 'cannot enter
-        # context: already entered' when Langfuse/OTel instrumentation is
-        # active — sharing one ctx object across concurrent workers causes
-        # re-entrancy errors when a second thread enters the same context.
+        # Capture the active tracker here (submitting thread) — ThreadPoolExecutor
+        # workers do not inherit ContextVars, so we inject it explicitly via closure.
+        _active_tracker = _usage_ctx.get()
+
         def _run_chunk(chunk):
-            with worker_context():
-                return run(chunk)
+            if _active_tracker is not None:
+                token = _usage_ctx.set(_active_tracker)
+                try:
+                    return run(chunk)
+                finally:
+                    _usage_ctx.reset(token)
+            return run(chunk)
 
         with ThreadPoolExecutor(max_workers=min(envs.LLM_CONCURRENCY, len(chunks))) as pool:
             maps = list(pool.map(_run_chunk, chunks))

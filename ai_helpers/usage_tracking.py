@@ -124,6 +124,8 @@ def record_usage(provider: str, model: str, input_tokens: int, output_tokens: in
         cost = (input_tokens / 1_000_000) * in_rate + (output_tokens / 1_000_000) * out_rate
 
     tracker = _usage_ctx.get()
+    if tracker is None:
+        logger.warning(f"record_usage: NO TRACKER — provider={provider} model={model} in={input_tokens} out={output_tokens} — tokens will be lost")
     if tracker is not None:
         tracker.calls.append({
             "provider": provider,

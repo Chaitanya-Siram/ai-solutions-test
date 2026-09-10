@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 from agents.tagging_agent.llm_service import _AZURE_ALIASES
-from ai_helpers.usage_tracking import worker_context
+from ai_helpers.usage_tracking import _usage_ctx
 from configs import envs, logger
 
 
@@ -470,9 +470,18 @@ def run_in_batches_streaming(
     max_workers = max(1, min(envs.LLM_CONCURRENCY, total_batches))
     completed = 0
 
+    # Capture the active tracker here (in the submitting thread) — ThreadPoolExecutor
+    # workers do not inherit ContextVars, so we must propagate it explicitly via closure.
+    _active_tracker = _usage_ctx.get()
+
     def _run_chunk_in_ctx(i: int, c: list[dict[str, Any]]) -> tuple[int, list[dict[str, Any]]]:
-        with worker_context():
-            return run_chunk(i, c)
+        if _active_tracker is not None:
+            token = _usage_ctx.set(_active_tracker)
+            try:
+                return run_chunk(i, c)
+            finally:
+                _usage_ctx.reset(token)
+        return run_chunk(i, c)
 
     with ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = [pool.submit(_run_chunk_in_ctx, i, c) for i, c in enumerate(chunks)]
@@ -530,9 +539,16 @@ def run_in_batches(
     if len(chunks) == 1 or envs.LLM_CONCURRENCY <= 1:
         results = [run_chunk(c) for c in chunks]
     else:
+        _active_tracker = _usage_ctx.get()
+
         def _run_chunk_in_ctx(c: list[dict[str, Any]]) -> list[dict[str, Any]]:
-            with worker_context():
-                return run_chunk(c)
+            if _active_tracker is not None:
+                token = _usage_ctx.set(_active_tracker)
+                try:
+                    return run_chunk(c)
+                finally:
+                    _usage_ctx.reset(token)
+            return run_chunk(c)
 
         with ThreadPoolExecutor(max_workers=min(envs.LLM_CONCURRENCY, len(chunks))) as pool:
             results = list(pool.map(_run_chunk_in_ctx, chunks))

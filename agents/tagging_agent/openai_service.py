@@ -105,7 +105,6 @@ def _tag_batch(
                     "name": TAG_TOOL_NAME
                 }
             },
-            langfuse_observation_id=None,  # let Langfuse generate; nests under parent span
         )
         if completion.usage:
             record_usage(
